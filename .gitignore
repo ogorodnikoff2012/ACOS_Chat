@@ -19,3 +19,4 @@
 **/.DS_Store
 **/thumbs.db
 coreutils/bin/*
+**/*.py*
