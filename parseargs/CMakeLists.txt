@@ -5,4 +5,4 @@ set(CMAKE_C_FLAGS "-std=gnu99 -O2")
 
 include_directories("include")
 
-add_library(parseargs STATIC parseargs.c)
+add_library(parseargs STATIC src/parseargs.c)
