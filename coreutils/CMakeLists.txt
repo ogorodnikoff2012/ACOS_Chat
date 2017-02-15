@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(ls)
 
-set(CMAKE_C_FLAGS "-std=c99 -O2 -DDEBUG")
+set(CMAKE_C_FLAGS "-std=c11 -O2 -DDEBUG")
 
 include_directories("include")
 
