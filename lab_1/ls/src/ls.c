@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <stdio.h> 
 #include <sys/types.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <parseargs/parseargs.h>
@@ -27,8 +28,10 @@ typedef struct dirent dirent_t;
 typedef struct stat stat_t;
 typedef struct timespec timespec_t;
 
+BEGIN_ARG_ENUM
 ADD_ARG('l', show_long_info)
 ADD_ARG('a', show_all)
+END_ARG_ENUM
 
 static inline unsigned long long max_u64(unsigned long long a, unsigned long long b) {
     return a < b ? b : a;
@@ -107,7 +110,7 @@ void process_direntry(DIR *dir, const dirent_t *entry, unsigned int *table) {
     printf("%s%c\n", fname, filetype_suffix(s.st_mode & __S_IFMT));
 }
 
-void process_dir(const char *dirname) {
+void process_dir(const char *dirname, arg_arr_t arg_arr) {
     unsigned int table_columns_width[COL_TOTAL_COUNT];
     for (int i = 0; i < COL_TOTAL_COUNT; ++i) {
         table_columns_width[i] = 0;
@@ -116,7 +119,7 @@ void process_dir(const char *dirname) {
     DIR *dir;
     dirent_t *entry;
 
-    if (show_long_info) {
+    if (arg_arr[show_long_info]) {
         dir = opendir(dirname);
         entry = readdir(dir);
         while (entry != NULL) {
@@ -136,10 +139,11 @@ void process_dir(const char *dirname) {
 }
 
 int main(int argc, char *argv[]) {
-    parse_args(argc, argv);
+    arg_arr_t arg_arr;
+    parse_args(argc, argv, arg_arr);
 
 #ifdef DEBUG
-    printf("Show long info: %d; show all: %d\n", show_long_info, show_all);
+    printf("Show long info: %d; show all: %d\n", arg_arr[show_long_info], arg_arr[show_all]);
 #endif
 
     int processed_dirs_cnt = 0;
@@ -147,13 +151,13 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] != '-') {
             printf("%s:\n", argv[i]);
-            process_dir(argv[i]);
+            process_dir(argv[i], arg_arr);
             ++processed_dirs_cnt;
         }
     }
 
     if (!processed_dirs_cnt) {
-        process_dir("./");
+        process_dir("./", arg_arr);
     }
 
     return 0;
