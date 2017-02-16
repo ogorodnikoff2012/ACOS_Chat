@@ -55,6 +55,8 @@ char filetype_suffix(__mode_t st_mode) {
 char filetype_prefix(__mode_t st_mode) {
     switch (st_mode) {
         case __S_IFDIR: return 'd';
+        case __S_IFCHR: return 'c';
+        case __S_IFBLK: return 'b';
         default: return '-';
     }
 }
