@@ -1,3 +1,9 @@
+#define __USE_XOPEN 
+#define __USE_ATFILE
+
+#include <fcntl.h>
+#include <errno.h>
+#include <error.h>
 #include <unistd.h>
 #include <stdio.h> 
 #include <sys/types.h>
@@ -8,9 +14,13 @@
 #include <pwd.h>
 #include <grp.h>
 #include <time.h>
+#include <stdlib.h>
 
 #define RWX_STRING      "rwxrwxrwx"
 #define TIME_FORMAT     "%b %d %Y %H:%M"
+
+int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
+int dirfd(DIR *dirp);
 
 typedef enum {
     COL_MODE,
@@ -43,20 +53,21 @@ static inline unsigned int int_length(unsigned long long n) {
     return ans;
 }
 
-char filetype_suffix(__mode_t st_mode) {
+char filetype_suffix(mode_t st_mode) {
     switch(st_mode) {
-        case __S_IFDIR: return '/';
-        case __S_IFIFO: return '|';
-        case __S_IFLNK: return '@';
+        case S_IFDIR: return '/';
+        case S_IFIFO: return '|';
+        case S_IFLNK: return '@';
         default: return ' ';
     }
 }
 
-char filetype_prefix(__mode_t st_mode) {
+char filetype_prefix(mode_t st_mode) {
     switch (st_mode) {
-        case __S_IFDIR: return 'd';
-        case __S_IFCHR: return 'c';
-        case __S_IFBLK: return 'b';
+        case S_IFDIR: return 'd';
+        case S_IFCHR: return 'c';
+        case S_IFBLK: return 'b';
+        case S_IFLNK: return 'l';
         default: return '-';
     }
 }
@@ -81,7 +92,13 @@ void prepare_table(DIR *dir, const dirent_t *entry, unsigned int *table) {
     if (!show_all && fname[0] == '.') { return; }
 
     stat_t s;
-    fstatat(dirfd(dir), fname, &s, 0);
+    int fd = dirfd(dir);
+    if (fd < 0) {
+        error(1, errno, "Error while processing %s", fname);
+    }
+    if (fstatat(fd, fname, &s, AT_SYMLINK_NOFOLLOW)) {
+        error(1, errno, "Error while processing %s", fname);
+    }
     table[COL_NLINK] = max_u64(table[COL_NLINK], int_length(s.st_nlink));
     table[COL_USER]  = max_u64(table[COL_USER],  strlen(getpwuid(s.st_uid)->pw_name));
     table[COL_GROUP] = max_u64(table[COL_GROUP], strlen(getgrgid(s.st_gid)->gr_name));
@@ -89,22 +106,49 @@ void prepare_table(DIR *dir, const dirent_t *entry, unsigned int *table) {
     table[COL_CTIME] = max_u64(table[COL_CTIME], strlen(get_change_time(&s)));
 }
 
+void print_symlink(int dirfd, const char *fname) {
+    int strsz = 2 * PATH_MAX + 1;
+    char *linkname = malloc(strsz);
+    if (linkname == NULL) {
+        error(1, errno, "Error while reading symlink");
+    }
+    int r = readlinkat(dirfd, fname, linkname, strsz);
+    if (r < 0) {
+        error(1, errno, "Error while reading symlink");
+    }
+   
+    linkname[r < strsz ? r : strsz] = '\0';
+    fputs(linkname, stdout);
+    free(linkname);
+}
+
 void process_direntry(DIR *dir, const dirent_t *entry, unsigned int *table) {
     const char *fname = entry->d_name;
     if (!show_all && fname[0] == '.') { return; }
 
     stat_t s;
-    fstatat(dirfd(dir), fname, &s, 0);
+    int fd = dirfd(dir);
+    if (fd < 0) {
+        error(1, errno, "Error while processing %s", fname);
+    }
+    if (fstatat(fd, fname, &s, AT_SYMLINK_NOFOLLOW)) {
+        error(1, errno, "Error while processing %s", fname);
+    }
     if (show_long_info) {
         printf("%c%s %*ld %*s %*s %*ld %*s ", 
-                filetype_prefix(s.st_mode & __S_IFMT), rwx(s.st_mode), 
+                filetype_prefix(s.st_mode & S_IFMT), rwx(s.st_mode), 
                 table[COL_NLINK], s.st_nlink,
                 table[COL_USER],  getpwuid(s.st_uid)->pw_name,
                 table[COL_GROUP], getgrgid(s.st_gid)->gr_name,
                 table[COL_FSIZE], s.st_size,
                 table[COL_CTIME], get_change_time(&s));
     }
-    printf("%s%c\n", fname, filetype_suffix(s.st_mode & __S_IFMT));
+    printf("%s%c", fname, filetype_suffix(s.st_mode & S_IFMT));
+    if (show_long_info && S_ISLNK(s.st_mode)) {
+        printf(" -> ");
+        print_symlink(fd, fname);
+    }
+    printf("\n");
 }
 
 void process_dir(const char *dirname) {
@@ -116,23 +160,34 @@ void process_dir(const char *dirname) {
     DIR *dir;
     dirent_t *entry;
 
+    dir = opendir(dirname);
+    if (dir == NULL) {
+        error(2, errno, "Cannot open directory %s", dirname);
+    }
+
     if (show_long_info) {
-        dir = opendir(dirname);
         entry = readdir(dir);
         while (entry != NULL) {
             prepare_table(dir, entry, table_columns_width);
             entry = readdir(dir);
         } 
-        closedir(dir);
+        if (errno == EBADF) {
+            error(1, EBADF, "Invalid directory descriptor");
+        }
+        rewinddir(dir);
     }
 
-    dir = opendir(dirname);
     entry = readdir(dir);
     while (entry != NULL) {
         process_direntry(dir, entry, table_columns_width);
         entry = readdir(dir);
     } 
-    closedir(dir);
+    if (errno == EBADF) {
+        error(1, EBADF, "Invalid directory descriptor");
+    }
+    if (closedir(dir) && errno == EBADF) {
+        error(1, EBADF, "Invalid directory descriptor");
+    }
 }
 
 int main(int argc, char *argv[]) {

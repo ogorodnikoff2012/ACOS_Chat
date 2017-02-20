@@ -18,5 +18,5 @@
 **/a.out
 **/.DS_Store
 **/thumbs.db
-coreutils/bin/*
+**/bin/*
 **/*.py*
