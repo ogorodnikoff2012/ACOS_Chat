@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include <parseargs/parseargs.h>
+#include <stdbool.h>
 #include <string.h>
 #include <pwd.h>
 #include <grp.h>
@@ -37,8 +37,8 @@ typedef struct dirent dirent_t;
 typedef struct stat stat_t;
 typedef struct timespec timespec_t;
 
-ADD_ARG('l', show_long_info)
-ADD_ARG('a', show_all)
+bool show_long_info = false;
+bool show_all = false;
 
 static inline unsigned long long max_u64(unsigned long long a, unsigned long long b) {
     return a < b ? b : a;
@@ -190,8 +190,28 @@ void process_dir(const char *dirname) {
     }
 }
 
+int parse_args(int argc, char *argv[]) {
+    int opt;
+    while ((opt = getopt(argc, argv, "la")) != -1) {
+        switch (opt) {
+            case 'l':
+                show_long_info = true;
+                break;
+            case 'a':
+                show_all = true;
+                break;
+            default:
+                fprintf(stderr, "Usage: %s [-l] [-a] DIR1 [DIR2 ...]\n", argv[0]);
+                return EXIT_FAILURE;
+        }
+    }
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
-    parse_args(argc, argv);
+    if (parse_args(argc, argv) == EXIT_FAILURE) {
+        return EXIT_FAILURE;
+    }
 
 #ifdef DEBUG
     printf("Show long info: %d; show all: %d\n", show_long_info, show_all);
@@ -211,5 +231,5 @@ int main(int argc, char *argv[]) {
         process_dir("./");
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
