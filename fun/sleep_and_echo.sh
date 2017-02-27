@@ -1,21 +1,20 @@
 #!/bin/bash
 
 lock() {
-    while [ -f ".lock" ]; do
+    while ! mkdir ".lock" 2>/dev/null; do
         sleep .01
     done
-    touch ".lock"
 }
 
 unlock() {
-    rm ".lock"
+    rmdir ".lock"
 }
 
 inc_thread_cnt() {
     lock
     if ! [ -f ".threads" ]; then
         echo 1 > ".threads"
-        export thread_num=1
+        export thread_num=0
     else
         export thread_num=`cat ".threads"`
     fi
