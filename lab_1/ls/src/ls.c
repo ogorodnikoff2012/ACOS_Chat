@@ -89,7 +89,9 @@ const char *get_change_time(const stat_t *stat) {
 
 void prepare_table(DIR *dir, const dirent_t *entry, unsigned int *table) {
     const char *fname = entry->d_name;
-    if (!show_all && fname[0] == '.') { return; }
+    if (!show_all && fname[0] == '.') { 
+        return; 
+    }
 
     stat_t s;
     int fd = dirfd(dir);
@@ -124,7 +126,9 @@ void print_symlink(int dirfd, const char *fname) {
 
 void process_direntry(DIR *dir, const dirent_t *entry, unsigned int *table) {
     const char *fname = entry->d_name;
-    if (!show_all && fname[0] == '.') { return; }
+    if (!show_all && fname[0] == '.') { 
+        return; 
+    }
 
     stat_t s;
     int fd = dirfd(dir);
@@ -219,12 +223,10 @@ int main(int argc, char *argv[]) {
 
     int processed_dirs_cnt = 0;
 
-    for (int i = 1; i < argc; ++i) {
-        if (argv[i][0] != '-') {
-            printf("%s:\n", argv[i]);
-            process_dir(argv[i]);
-            ++processed_dirs_cnt;
-        }
+    for (int i = optind; i < argc; ++i) {
+        printf("%s:\n", argv[i]);
+        process_dir(argv[i]);
+        ++processed_dirs_cnt;
     }
 
     if (!processed_dirs_cnt) {
