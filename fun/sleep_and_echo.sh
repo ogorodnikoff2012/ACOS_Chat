@@ -13,7 +13,6 @@ unlock() {
 inc_thread_cnt() {
     lock
     if ! [ -f ".threads" ]; then
-        echo 1 > ".threads"
         export thread_num=0
     else
         export thread_num=`cat ".threads"`

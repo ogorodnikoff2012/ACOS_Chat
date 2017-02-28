@@ -5,7 +5,7 @@ set(CMAKE_C_FLAGS "-std=gnu99 -O2")
 
 include_directories("include")
 
-add_subdirectory("lib/parseargs")
+add_subdirectory("./lib/tableprint")
 
 add_executable(top src/top.c)
-target_link_libraries(top parseargs)
+target_link_libraries(top tableprint)
