@@ -125,7 +125,9 @@ int main(int argc, char *argv[]) {
     for (int i = optind + 1; i < argc; ++i) {
         const char *fname = argv[i];
         FILE *f = NULL;
+        bool from_stdin = false;
         if (strcmp(fname, "-") == 0) {
+            from_stdin = true;
             f = stdin;
             fname = "stdin";
         } else {
@@ -139,7 +141,9 @@ int main(int argc, char *argv[]) {
             continue;
         }
         process_file(f, pattern, invert_match);
-        fclose(f);
+        if (!from_stdin) {
+            fclose(f);
+        }
     }
 
     free_pattern(pattern);
