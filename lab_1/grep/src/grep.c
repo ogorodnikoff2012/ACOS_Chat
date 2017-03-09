@@ -42,6 +42,9 @@ pattern_t *build_pattern(const char *str, match_t match) {
 }
 
 int match_pattern(const pattern_t *pattern, const char *str) {
+    if (pattern->length == 0) {
+        return 0;
+    }
     int best_suffix_len = 0;
     int s_len = strlen(str);
     for (int i = 0; i < s_len; ++i) {
@@ -80,7 +83,24 @@ match_t select_match_func(bool ignore_case) {
     }
 }
 
-void process_file(FILE *f, pattern_t *pattern, bool invert_match) {
+void process_file(const char *fname, pattern_t *pattern, bool invert_match, bool print_fname) {
+    FILE *f = NULL;
+    bool from_stdin = false;
+    if (strcmp(fname, "-") == 0) {
+        from_stdin = true;
+        f = stdin;
+        fname = "stdin";
+    } else {
+        f = fopen(fname, "r");
+    }
+    if (print_fname) {
+        printf(ANSI_GREEN_COLOR "%s" ANSI_RESET_COLOR ":\n", fname);
+    }
+    if (f == NULL) {
+        fprintf(stderr, "Error: cannot open file %s: %s\n", fname, strerror(errno));
+        return;
+    }
+
     char *line = NULL;
     size_t len = 0, read;
     while ((read = getline(&line, &len, f)) != -1) {
@@ -94,6 +114,10 @@ void process_file(FILE *f, pattern_t *pattern, bool invert_match) {
         }   
     }
     free(line);
+
+    if (!from_stdin) {
+        fclose(f);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -115,34 +139,13 @@ int main(int argc, char *argv[]) {
     
     int file_count = argc - optind - 1;
 
-    if (file_count <= 0) {
-        fprintf(stderr, "Error: no input file\n");
-        return EXIT_FAILURE;
-    }
-    
-    pattern_t *pattern = build_pattern(argv[optind], select_match_func(ignore_case));
+    pattern_t *pattern = build_pattern((file_count < 0) ? "" : argv[optind], select_match_func(ignore_case));
 
-    for (int i = optind + 1; i < argc; ++i) {
-        const char *fname = argv[i];
-        FILE *f = NULL;
-        bool from_stdin = false;
-        if (strcmp(fname, "-") == 0) {
-            from_stdin = true;
-            f = stdin;
-            fname = "stdin";
-        } else {
-            f = fopen(fname, "r");
-        }
-        if (file_count > 1) {
-            printf(ANSI_GREEN_COLOR "%s" ANSI_RESET_COLOR ":\n", fname);
-        }
-        if (f == NULL) {
-            fprintf(stderr, "Error: cannot open file %s: %s\n", fname, strerror(errno));
-            continue;
-        }
-        process_file(f, pattern, invert_match);
-        if (!from_stdin) {
-            fclose(f);
+    if (file_count <= 0) {
+        process_file("-", pattern, invert_match, false);
+    } else {
+        for (int i = optind + 1; i < argc; ++i) {
+            process_file(argv[i], pattern, invert_match, file_count > 1);
         }
     }
 
