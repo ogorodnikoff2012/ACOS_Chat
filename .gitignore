@@ -21,3 +21,5 @@
 **/bin/*
 **/*.py*
 **/*.log
+
+examples/*
