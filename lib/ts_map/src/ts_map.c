@@ -59,10 +59,12 @@ static void left_turn(ts_map_node_t *node) {
 
     if (parent != NULL) {
         if (node_left) {
-            connect_left(parent, node);
+            connect_left(parent, new_root);
         } else {
-            connect_right(parent, node);
+            connect_right(parent, new_root);
         }
+    } else {
+        new_root->parent = NULL;
     }
 }
 
@@ -80,10 +82,12 @@ static void right_turn(ts_map_node_t *node) {
 
     if (parent != NULL) {
         if (node_left) {
-            connect_left(parent, node);
+            connect_left(parent, new_root);
         } else {
-            connect_right(parent, node);
+            connect_right(parent, new_root);
         }
+    } else {
+        new_root->parent = NULL;
     }
 }
 
@@ -107,13 +111,13 @@ static ts_map_node_t *splay(ts_map_node_t *node) {
                 right_turn(g);
                 right_turn(p);
             } else {
-                left_turn(p);
-                right_turn(g);
+                right_turn(p);
+                left_turn(g);
             }
         } else {
             if (p_left) {
-                right_turn(p);
-                left_turn(g);
+                left_turn(p);
+                right_turn(g);
             } else {
                 left_turn(g);
                 left_turn(p);
@@ -176,13 +180,17 @@ static void split(ts_map_node_t *tree, int key,
     if (tree->key < key) {
         *left = tree;
         *right = tree->right;
-        tree->right->parent = NULL;
-        tree->right = NULL;
+        if (tree->right != NULL) {
+            tree->right->parent = NULL;
+            tree->right = NULL;
+        }
     } else {
         *right = tree;
         *left = tree->left;
-        tree->left->parent = NULL;
-        tree->left = NULL;
+        if (tree->left != NULL) {
+            tree->left->parent = NULL;
+            tree->left = NULL;
+        }
     }
 }
 
