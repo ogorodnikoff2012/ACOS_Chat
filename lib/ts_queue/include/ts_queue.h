@@ -13,14 +13,15 @@ typedef struct ts_queue_node {
 
 typedef struct ts_queue {
     ts_queue_node_t *first, *last;
+    bool frozen;
     pthread_mutex_t mutex;
     size_t size;
 } ts_queue_t;
 
 void ts_queue_init(ts_queue_t *q);
-void ts_queue_destroy(ts_queue_t *q);
+void ts_queue_destroy(ts_queue_t *q, void (* destructor)(void *));
 
-void ts_queue_push(ts_queue_t *q, void *val);
+bool ts_queue_push(ts_queue_t *q, void *val);
 void *ts_queue_pop(ts_queue_t *q);
 size_t ts_queue_size(ts_queue_t *q);
 bool ts_queue_empty(ts_queue_t *q);

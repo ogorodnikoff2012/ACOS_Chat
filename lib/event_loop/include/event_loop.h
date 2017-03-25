@@ -6,6 +6,7 @@
 
 typedef struct event {
     int type;
+    void (* deleter)(struct event *);
 } event_t;
 
 #define EXIT_EVENT_TYPE 0

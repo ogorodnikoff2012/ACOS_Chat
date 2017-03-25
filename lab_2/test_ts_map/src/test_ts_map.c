@@ -64,6 +64,6 @@ int main() {
 /*        fprintf(stderr, "%d\n", ch); */
     }
 
-    ts_map_destroy(&map);
+    ts_map_destroy(&map, free);
     return 0;
 }

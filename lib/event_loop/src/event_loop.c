@@ -8,6 +8,11 @@ static void default_deleter(event_t *evt) {
     free(evt);
 }
 
+static void event_destructor(void *evt) {
+    event_t *e = (event_t *) evt;
+    e->deleter(e);
+}
+
 /* Global functions */
 
 event_t EXIT_EVT = {0};
@@ -19,9 +24,9 @@ void event_loop_init(event_loop_t *el) {
 }
 
 void event_loop_destroy(event_loop_t *el) {
-    ts_map_destroy(&el->deleters);
-    ts_map_destroy(&el->handlers);
-    ts_queue_destroy(&el->event_queue);
+    ts_queue_destroy(&el->event_queue, event_destructor);
+    ts_map_destroy(&el->deleters, NULL);
+    ts_map_destroy(&el->handlers, NULL);
 }
 
 void run_event_loop(event_loop_t *el) {
@@ -40,16 +45,16 @@ void run_event_loop(event_loop_t *el) {
             if (handler != NULL) {
                 handler(evt);
             }
-            evt_handler_t deleter = ts_map_find(&el->deleters, evt->type);
-            if (deleter == NULL) {
-                deleter = default_deleter;
-            }
-            deleter(evt);
+            evt->deleter(evt);
         }
         pthread_yield();
     }
 }
 
 void send_event(event_loop_t *el, event_t *evt) {
+    evt->deleter = ts_map_find(&el->deleters, evt->type);
+    if (evt->deleter == NULL) {
+        evt->deleter = default_deleter;
+    }
     ts_queue_push(&el->event_queue, evt);
 }

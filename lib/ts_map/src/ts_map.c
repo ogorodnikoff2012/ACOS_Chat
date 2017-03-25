@@ -7,10 +7,13 @@
 
 /* Static functions */
 
-static void ts_map_node_destroy(ts_map_node_t *node) {
+static void ts_map_node_destroy(ts_map_node_t *node, void (* destructor)(void *)) {
     if (node != NULL) {
-        ts_map_node_destroy(node->left);
-        ts_map_node_destroy(node->right);
+        ts_map_node_destroy(node->left, destructor);
+        ts_map_node_destroy(node->right, destructor);
+        if (destructor != NULL) {
+            destructor(node->val);
+        }
         free(node);
     }
 }
@@ -219,17 +222,20 @@ static ts_map_node_t *add(ts_map_node_t *tree, int key, void *val) {
     return root;
 }
 
-static ts_map_node_t *remove(ts_map_node_t *tree, int key) {
+static ts_map_node_t *remove(ts_map_node_t *tree, int key, void **val) {
     if (tree == NULL) {
+        *val = NULL;
         return NULL;
     }
 
     find(tree, key);
     if (tree->key != key) {
+        *val = NULL;
         return tree;
     }
 
     ts_map_node_t *left = tree->left, *right = tree->right;
+    *val = tree->val;
     free(tree);
 
     return merge(left, right);
@@ -242,21 +248,30 @@ void ts_map_init(ts_map_t *m) {
     
     LOCK;
     m->root = NULL;
+    m->frosen = false;
     UNLOCK;
 }
 
-void ts_map_destroy(ts_map_t *m) {
+void ts_map_destroy(ts_map_t *m, void (* destructor)(void *)) {
     LOCK;
-    ts_map_node_destroy(m->root);
+    ts_map_node_destroy(m->root, destructor);
+    m->frosen = true;
     UNLOCK;
 
     pthread_mutex_destroy(&m->mutex);
 }
 
-void ts_map_insert(ts_map_t *m, int key, void *val) {
+bool ts_map_insert(ts_map_t *m, int key, void *val) {
+    bool success;
     LOCK;
-    m->root = add(m->root, key, val);
+    if (m->frosen) {
+        success = false;
+    } else {
+        m->root = add(m->root, key, val);
+        success = true;
+    }
     UNLOCK;
+    return success;
 }
 
 void *ts_map_find(ts_map_t *m, int key) {
@@ -270,8 +285,12 @@ void *ts_map_find(ts_map_t *m, int key) {
     return ans;
 }
 
-void ts_map_erase(ts_map_t *m, int key) {
+void *ts_map_erase(ts_map_t *m, int key) {
+    void *val = NULL;
     LOCK;
-    m->root = remove(m->root, key);
+    if (!m->frosen) {
+        m->root = remove(m->root, key, &val);
+    }
     UNLOCK;
+    return val;
 }
