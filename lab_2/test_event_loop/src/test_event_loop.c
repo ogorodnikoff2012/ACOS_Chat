@@ -8,7 +8,9 @@ event_loop_t loop;
 #define NUMBER_EVENT_TYPE 1
 
 typedef struct number_event {
-    int type, data;
+    int type;
+    void (* deleter)(event_t *);
+    int data;
 } number_event_t;
 
 event_t *new_number_event(int x) {
