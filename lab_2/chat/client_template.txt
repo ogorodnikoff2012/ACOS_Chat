@@ -1,0 +1,37 @@
+gui_init():
+    /* Init windows, forms, data structures etc. */
+
+gui_destroy():
+    /* You know what you want to do here, don't you? */
+
+network_init():
+    /* Establish connection with server */
+
+network_destroy():
+    /* ... */
+
+controller_init():
+
+controller_destroy():
+
+Input threads:
+1) GUI Thread
+
+    while (true) {
+        int ch = getch(); /* NONBLOCK */
+        if (ch != -1) {
+            process_input();
+        }
+        redraw_components();
+    }
+
+2) Network thread
+
+    while (true) {
+        recv();
+        parse();
+        send_evt_to_controller();
+    }
+
+Event threads:
+1) Controller thread

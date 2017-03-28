@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(event_loop)
 
-set(CMAKE_C_FLAGS "-std=gnu99 -O2")
+set(CMAKE_C_FLAGS "-std=gnu99 -O2 ${CMAKE_C_FLAGS}")
 
 find_package(Threads)
 include_directories("include")

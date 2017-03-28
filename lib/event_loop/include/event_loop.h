@@ -12,7 +12,7 @@ typedef struct event {
 #define EXIT_EVENT_TYPE 0
 extern event_t EXIT_EVT;
 
-typedef void (* evt_handler_t)(event_t *);
+typedef void (* evt_handler_t)(event_t *, void *);
 
 typedef struct event_loop {
     ts_map_t handlers, deleters;
@@ -22,7 +22,7 @@ typedef struct event_loop {
 void event_loop_init(event_loop_t *el);
 void event_loop_destroy(event_loop_t *el);
 
-void run_event_loop(event_loop_t *el);
+void run_event_loop(event_loop_t *el, void *data);
 
 void send_event(event_loop_t *el, event_t *evt);
 

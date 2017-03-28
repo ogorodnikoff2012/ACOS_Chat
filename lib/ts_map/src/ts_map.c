@@ -130,7 +130,7 @@ static ts_map_node_t *splay(ts_map_node_t *node) {
     return node;
 }
 
-static ts_map_node_t *find(ts_map_node_t *root, int key) {
+static ts_map_node_t *find(ts_map_node_t *root, uint64_t key) {
     if (root == NULL) {
         return NULL;
     }
@@ -173,7 +173,7 @@ static ts_map_node_t *merge(ts_map_node_t *left, ts_map_node_t *right) {
     return tree;
 }
 
-static void split(ts_map_node_t *tree, int key,
+static void split(ts_map_node_t *tree, uint64_t key,
                   ts_map_node_t **left, ts_map_node_t **right) {
     if (tree == NULL) {
         *left = *right = NULL;
@@ -197,7 +197,7 @@ static void split(ts_map_node_t *tree, int key,
     }
 }
 
-static ts_map_node_t *add(ts_map_node_t *tree, int key, void *val) {
+static ts_map_node_t *add(ts_map_node_t *tree, uint64_t key, void *val) {
     if (tree == NULL) {
         ts_map_node_t *node = calloc(1, sizeof(ts_map_node_t));
         node->left = node->right = node->parent = NULL;
@@ -222,7 +222,7 @@ static ts_map_node_t *add(ts_map_node_t *tree, int key, void *val) {
     return root;
 }
 
-static ts_map_node_t *remove(ts_map_node_t *tree, int key, void **val) {
+static ts_map_node_t *remove(ts_map_node_t *tree, uint64_t key, void **val) {
     if (tree == NULL) {
         *val = NULL;
         return NULL;
@@ -261,7 +261,7 @@ void ts_map_destroy(ts_map_t *m, void (* destructor)(void *)) {
     pthread_mutex_destroy(&m->mutex);
 }
 
-bool ts_map_insert(ts_map_t *m, int key, void *val) {
+bool ts_map_insert(ts_map_t *m, uint64_t key, void *val) {
     bool success;
     LOCK;
     if (m->frosen) {
@@ -274,7 +274,7 @@ bool ts_map_insert(ts_map_t *m, int key, void *val) {
     return success;
 }
 
-void *ts_map_find(ts_map_t *m, int key) {
+void *ts_map_find(ts_map_t *m, uint64_t key) {
     void *ans = NULL;
     LOCK;
     m->root = find(m->root, key);
@@ -285,7 +285,7 @@ void *ts_map_find(ts_map_t *m, int key) {
     return ans;
 }
 
-void *ts_map_erase(ts_map_t *m, int key) {
+void *ts_map_erase(ts_map_t *m, uint64_t key) {
     void *val = NULL;
     LOCK;
     if (!m->frosen) {

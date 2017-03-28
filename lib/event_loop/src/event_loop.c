@@ -29,7 +29,7 @@ void event_loop_destroy(event_loop_t *el) {
     ts_map_destroy(&el->handlers, NULL);
 }
 
-void run_event_loop(event_loop_t *el) {
+void run_event_loop(event_loop_t *el, void *data) {
     bool work = true;
     while (work) {
         while (!ts_queue_empty(&el->event_queue)) {
@@ -43,7 +43,7 @@ void run_event_loop(event_loop_t *el) {
             }
             evt_handler_t handler = ts_map_find(&el->handlers, evt->type);
             if (handler != NULL) {
-                handler(evt);
+                handler(evt, data);
             }
             evt->deleter(evt);
         }
