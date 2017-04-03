@@ -43,7 +43,7 @@ int read_bits(FILE *f, int pos, int count, char *ans) {
             fprintf(stderr, "Cannot read bit #%d\n", pos + i);
             return -1;
         }
-        ans[i >> 3] = ans[i >> 3] & ~(1 << offset) | (bit << (offset));
+        ans[i >> 3] = (ans[i >> 3] & ~(1 << offset)) | (bit << (offset));
         ++offset;
         offset &= 7;
     }
