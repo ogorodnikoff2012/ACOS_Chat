@@ -24,6 +24,8 @@ void event_loop_destroy(event_loop_t *el);
 
 void run_event_loop(event_loop_t *el, void *data);
 
+bool event_loop_iteration(event_loop_t *el, void *data);
+
 void send_event(event_loop_t *el, event_t *evt);
 
 #endif /* XENON_EVENT_LOOP_EVENT_LOOP_H */

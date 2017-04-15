@@ -29,23 +29,27 @@ void event_loop_destroy(event_loop_t *el) {
     ts_map_destroy(&el->handlers, NULL);
 }
 
+bool event_loop_iteration(event_loop_t *el, void *data) {
+    event_t *evt = ts_queue_pop(&el->event_queue);
+    if (evt == NULL) {
+        return true;
+    }
+    if (evt->type == EXIT_EVENT_TYPE) {
+        return false;
+    }
+    evt_handler_t handler = ts_map_find(&el->handlers, evt->type);
+    if (handler != NULL) {
+        handler(evt, data);
+    }
+    evt->deleter(evt);
+    return true;
+}
+
 void run_event_loop(event_loop_t *el, void *data) {
     bool work = true;
     while (work) {
-        while (!ts_queue_empty(&el->event_queue)) {
-            event_t *evt = ts_queue_pop(&el->event_queue);
-            if (evt == NULL) {
-                continue;
-            }
-            if (evt->type == EXIT_EVENT_TYPE) {
-                work = false;
-                break;
-            }
-            evt_handler_t handler = ts_map_find(&el->handlers, evt->type);
-            if (handler != NULL) {
-                handler(evt, data);
-            }
-            evt->deleter(evt);
+        while (work && !ts_queue_empty(&el->event_queue)) {
+            work = event_loop_iteration(el, data);
         }
         pthread_yield();
     }
