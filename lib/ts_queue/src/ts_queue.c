@@ -59,6 +59,33 @@ bool ts_queue_push(ts_queue_t *q, void *val) {
     return success;
 }
 
+bool ts_queue_push_in_front(ts_queue_t *q, void *val) {
+    bool success;
+    ts_queue_node_t *node = calloc(1, sizeof(ts_queue_node_t));
+    node->val = val;
+
+    LOCK;
+    if (q->frozen) {
+        success = false;
+    } else {
+        if (q->size == 0) {
+            q->last = q->first = node;
+            q->size = 1;
+        } else {
+            node->next = q->first;
+            q->first = node;
+            ++q->size;
+        }
+        success = true;
+    }
+    UNLOCK;
+
+    if (!success) {
+        free(node);
+    }
+    return success;
+}
+
 void *ts_queue_pop(ts_queue_t *q) {
     void *val = NULL;
     ts_queue_node_t *node = NULL;

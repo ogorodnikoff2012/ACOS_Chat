@@ -25,6 +25,9 @@ int main() {
     gui_init(&gui_data);
     struct timeval tv;
     
+    pthread_t gui;
+    pthread_create(&gui, NULL, gui_thread, &gui_data);
+    
     gettimeofday(&tv, NULL);
     send_event(&gui_data.event_loop, (event_t *) new_message_event(new_regular_message(strdup("Xenon"), strdup("Тестовое сообщение #1"), tv)));
 
@@ -33,9 +36,6 @@ int main() {
     gettimeofday(&tv, NULL);
     send_event(&gui_data.event_loop, (event_t *) new_message_event(new_regular_message(strdup("Xenon"), strdup("Тестовое сообщение #2"), tv)));
 
-    pthread_t gui;
-    pthread_create(&gui, NULL, gui_thread, &gui_data);
-    
     usleep(1e6); // 1s
     send_event(&gui_data.event_loop, (event_t *) new_readinput_event(
                 strdup("Password"), true, readinput_callback_success,

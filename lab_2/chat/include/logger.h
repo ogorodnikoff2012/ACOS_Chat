@@ -1,0 +1,37 @@
+#ifndef XENON_CHAT_LOGGER_H
+#define XENON_CHAT_LOGGER_H
+
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#define __strftime_buffer_size__ 80
+
+static time_t __cur_time__;
+static char __strftime_buffer__[__strftime_buffer_size__];
+static int __strftime_strlen__;
+
+static const char *__short_file_name__(const char *fname) {
+    const char *ptr = strrchr(fname, '/');
+    return (ptr == NULL) ? (fname) : (ptr + 1);
+}
+
+#define LOG_PRE     time(&__cur_time__); \
+                    __strftime_strlen__ = strftime(__strftime_buffer__, \
+                            __strftime_buffer_size__, \
+                            "[%F %T]", localtime(&__cur_time__)); \
+                    fprintf(stderr, "%.*s ", __strftime_strlen__, \
+                            __strftime_buffer__);
+
+#ifdef DEBUG
+#define LOG(...)    LOG_PRE; \
+                    fprintf(stderr, "<at %s:%d> ", __short_file_name__(__FILE__), __LINE__); \
+                    fprintf(stderr, ##__VA_ARGS__); \
+                    fprintf(stderr, "\n");
+#else 
+#define LOG(...)    LOG_PRE; \
+                    fprintf(stderr, ##__VA_ARGS__); \
+                    fprintf(stderr, "\n");
+#endif
+
+#endif /* XENON_CHAT_LOGGER_H */

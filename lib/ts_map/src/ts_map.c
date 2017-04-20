@@ -18,6 +18,16 @@ static void ts_map_node_destroy(ts_map_node_t *node, void (* destructor)(void *)
     }
 }
 
+static size_t get_size(ts_map_node_t *node) {
+    return node == NULL ? 0 : node->size;
+}
+
+static void update_size(ts_map_node_t *node) {
+    if (node != NULL) {
+        node->size = 1 + get_size(node->left) + get_size(node->right);
+    }
+}
+
 static bool is_root(ts_map_node_t *node) {
     return node->parent == NULL;
 }
@@ -60,6 +70,9 @@ static void left_turn(ts_map_node_t *node) {
     connect_right(node, new_root->left);
     connect_left(new_root, node);
 
+    update_size(node);
+    update_size(new_root);
+
     if (parent != NULL) {
         if (node_left) {
             connect_left(parent, new_root);
@@ -82,6 +95,9 @@ static void right_turn(ts_map_node_t *node) {
 
     connect_left(node, new_root->right);
     connect_right(new_root, node);
+
+    update_size(node);
+    update_size(new_root);
 
     if (parent != NULL) {
         if (node_left) {
@@ -168,8 +184,15 @@ static ts_map_node_t *rightest(ts_map_node_t *node) {
 }
 
 static ts_map_node_t *merge(ts_map_node_t *left, ts_map_node_t *right) {
+    if (left == NULL) {
+        return right;
+    }
+    if (right == NULL) {
+        return left;
+    }
     ts_map_node_t *tree = splay(rightest(left));
     connect_right(tree, right);
+    update_size(tree);
     return tree;
 }
 
@@ -195,6 +218,8 @@ static void split(ts_map_node_t *tree, uint64_t key,
             tree->left = NULL;
         }
     }
+    update_size(*left);
+    update_size(*right);
 }
 
 static ts_map_node_t *add(ts_map_node_t *tree, uint64_t key, void *val) {
@@ -203,6 +228,7 @@ static ts_map_node_t *add(ts_map_node_t *tree, uint64_t key, void *val) {
         node->left = node->right = node->parent = NULL;
         node->key = key;
         node->val = val;
+        node->size = 1;
         return node;
     }
 
@@ -219,6 +245,7 @@ static ts_map_node_t *add(ts_map_node_t *tree, uint64_t key, void *val) {
     
     connect_left(root, root->left);
     connect_right(root, root->right);
+    update_size(root);
     return root;
 }
 
@@ -293,4 +320,27 @@ void *ts_map_erase(ts_map_t *m, uint64_t key) {
     }
     UNLOCK;
     return val;
+}
+
+size_t ts_map_size(ts_map_t *m) {
+    size_t ans;
+    LOCK;
+    ans = get_size(m->root);
+    UNLOCK;
+    return ans;
+}
+
+static void ts_map_forall_helper(ts_map_node_t *m, void *ptr, void (* callback)(uint64_t key, void *value, void *ptr)) {
+    if (m == NULL) {
+        return;
+    }
+    ts_map_forall_helper(m->left, ptr, callback);
+    callback(m->key, m->val, ptr);
+    ts_map_forall_helper(m->right, ptr, callback);
+} 
+
+void ts_map_forall(ts_map_t *m, void *ptr, void (* callback)(uint64_t key, void *value, void *ptr)) {
+    LOCK;
+    ts_map_forall_helper(m->root, ptr, callback);
+    UNLOCK;
 }

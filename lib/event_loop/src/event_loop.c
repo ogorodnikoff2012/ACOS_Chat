@@ -8,6 +8,8 @@ static void default_deleter(event_t *evt) {
     free(evt);
 }
 
+static void exit_evt_deleter_stub(event_t *evt) {}
+
 static void event_destructor(void *evt) {
     event_t *e = (event_t *) evt;
     e->deleter(e);
@@ -21,6 +23,7 @@ void event_loop_init(event_loop_t *el) {
     ts_queue_init(&el->event_queue);
     ts_map_init(&el->handlers);
     ts_map_init(&el->deleters);
+    ts_map_insert(&el->deleters, EXIT_EVENT_TYPE, exit_evt_deleter_stub);
 }
 
 void event_loop_destroy(event_loop_t *el) {
@@ -61,4 +64,12 @@ void send_event(event_loop_t *el, event_t *evt) {
         evt->deleter = default_deleter;
     }
     ts_queue_push(&el->event_queue, evt);
+}
+
+void send_urgent_event(event_loop_t *el, event_t *evt) {
+    evt->deleter = ts_map_find(&el->deleters, evt->type);
+    if (evt->deleter == NULL) {
+        evt->deleter = default_deleter;
+    }
+    ts_queue_push_in_front(&el->event_queue, evt);
 }

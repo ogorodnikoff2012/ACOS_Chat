@@ -2,5 +2,11 @@
 #define XENON_CHAT_CLIENT_DEFINES_H
 
 #define GUI_THREAD_ID 1
+#define CONTROLLER_THREAD_ID 2
+#define LISTENER_THREAD_ID 3
+
+#define MSG_HEADER_SIZE 5
+
+#define DB_FILENAME "xenon_chat_server.sqlite"
 
 #endif /* XENON_CHAT_CLIENT_DEFINES_H */

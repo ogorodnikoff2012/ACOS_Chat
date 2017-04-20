@@ -313,13 +313,15 @@ void *gui_thread(void *raw_ptr) {
                 case KEY_DC:
                     form_driver(data->input_form, REQ_DEL_CHAR);
                     break;
-                case KEY_ENTER:
-                    form_driver(data->input_form, REQ_NEXT_FIELD);
-                    wprintw(data->messages_pad, "=====\n%s\n",
-                            field_buffer(data->input_field[0], 0));
-                    data->redraw_messages = true;
-                    form_driver(data->input_form, REQ_CLR_FIELD);
-                    break;
+                case KEY_ENTER: {
+                        form_driver(data->input_form, REQ_NEXT_FIELD);
+                        char *s = str_strip(field_buffer(data->input_field[0], 0));
+                        wprintw(data->messages_pad, "=====\n%s\n", s);
+                        free(s);
+                        data->redraw_messages = true;
+                        form_driver(data->input_form, REQ_CLR_FIELD);
+                        break; 
+                    }
                 default:
                     form_driver(data->input_form, ch);
                     break;
