@@ -31,6 +31,7 @@ static void connection_deleter(void *ptr) {
 
 static char *prompt(const char *str) {
     printf("%s: ", str);
+    fflush(stdout);
     char *s = NULL;
     size_t n = 0;
     int len = getline(&s, &n, stdin);
@@ -61,6 +62,7 @@ bool listener_init(listener_data_t *data) {
        if (p > 0) {
            port = p;
        }
+       free(port_str);
     }
 
     data->server_socket.sockid = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -72,7 +74,7 @@ bool listener_init(listener_data_t *data) {
     struct sockaddr_in sock_port;
     sock_port.sin_family = AF_INET;
     sock_port.sin_port = htons(port);
-    sock_port.sin_addr.s_addr = htonl(INADDR_ANY);
+    sock_port.sin_addr.s_addr = INADDR_ANY;
     int status = bind(data->server_socket.sockid, 
             (struct sockaddr *) &sock_port, sizeof(sock_port));
     if (status == -1) {
@@ -124,12 +126,22 @@ static void process_connection(listener_data_t *data, int sockid) {
     if (conn->bytes_read < 5) {
         if (conn->header == NULL) {
             conn->header = malloc(MSG_HEADER_SIZE);
+            if (conn->header == NULL) {
+                LOG("ERROR while malloc(), closing connection");
+                close_connection(data, sockid);
+                return;
+            }
         }
         count = recv(sockid, conn->header + conn->bytes_read, conn->bytes_expected - conn->bytes_read, 0);
     } else {
         if (conn->body == NULL) {
             int body_size = ntohl(*(int *)(conn->header + 1));
             conn->body = malloc(body_size);
+            if (conn->body == NULL) {
+                LOG("ERROR while malloc(), closing connection");
+                close_connection(data, sockid);
+                return;
+            }
             conn->bytes_expected += body_size;
         }
         count = recv(sockid, conn->body + conn->bytes_read - MSG_HEADER_SIZE,
@@ -208,5 +220,6 @@ void *listener_thread(void *ptr) {
 
         work = event_loop_iteration(&data->event_loop, data);
     }
+    ts_vector_destroy(&polling_conns);
     pthread_exit(NULL);
 }

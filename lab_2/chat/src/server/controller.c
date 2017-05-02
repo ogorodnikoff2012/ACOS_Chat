@@ -7,6 +7,18 @@
 #include <defines.h>
 #include <pascal_string.h>
 #include <ts_vector/ts_vector.h>
+#include <unistd.h>
+
+void send_status_code(int sockid, int status) {
+    char buffer[MSG_HEADER_SIZE + 2 * sizeof(uint32_t)];
+    buffer[0] = 's';
+    *(int *)(buffer + 1) = htonl(2 * sizeof(uint32_t));
+    *(int *)(buffer + 5) = htonl(sizeof(uint32_t)); /* Yes, I know that magic constants are awful  */
+    *(int *)(buffer + 9) = htonl(status);
+
+    int stat = send(sockid, buffer, MSG_HEADER_SIZE + 2 * sizeof(uint32_t), 0);
+    LOG("Sent status code, result = %d", stat);
+}
 
 static void decrease_workers(controller_data_t *data) {
     send_urgent_event(&data->workers_event_loop, &EXIT_EVT);
@@ -26,8 +38,8 @@ static void input_msg_event_handler(event_t *ptr, void *dptr) {
     int msglen = ntohl(*(int *)(header + 1));
     LOG("Found message: type \'%c\', length %d", header[0], msglen);
     
-    ts_vector_t strings;
-    ts_vector_init(&strings, sizeof(char *));
+    ts_vector_t *strings = calloc(1, sizeof(ts_vector_t));
+    ts_vector_init(strings, sizeof(char *));
 
     char *iter = body, *end = body + msglen;
 
@@ -37,21 +49,24 @@ static void input_msg_event_handler(event_t *ptr, void *dptr) {
         char *next = iter + 4 + str->length;
         if (next > end) {
             LOG("Message corrupted");
-            /* send event about it */
+            evt->conn->in_worker = false;
+            send_status_code(evt->conn->sockid, MSG_STATUS_INVALID_MSG);
+            for (int i = 0; i < strings->size; ++i) {
+                free(*((char **)(strings->data) + i));
+            }
+            ts_vector_destroy(strings);
+            free(strings);
             return;
         }
         
         char *c_str = strndup(str->data, str->length);
         LOG("Found string: %s", c_str);
-        ts_vector_push_back(&strings, &c_str);
+        ts_vector_push_back(strings, &c_str);
         iter = next;
     }
 
     LOG("End of message");
-    for (int i = 0; i < strings.size; ++i) {
-        free(*(char **)(strings.data + i));
-    }
-    ts_vector_destroy(&strings);
+    send_event(&data->workers_event_loop, (event_t *) new_process_message_job(evt->conn, new_message(header[0], strings)));
 }
 
 static void input_msg_event_deleter(event_t *ptr) {
@@ -62,7 +77,6 @@ static void input_msg_event_deleter(event_t *ptr) {
     evt->conn->bytes_expected = MSG_HEADER_SIZE;
     evt->conn->header = NULL;
     evt->conn->body = NULL;
-    evt->conn->in_worker = false;
     free(evt);
 }
 
@@ -76,7 +90,6 @@ static void run_worker(controller_data_t *data) {
     worker->controller = data;
     worker->event_loop = &data->workers_event_loop;
     worker->controller_event_loop = &data->event_loop;
-    worker->db = data->db;
     worker->worker_id = unique_id();
     pthread_create(&worker->thread, NULL, worker_thread, worker);
     ts_map_insert(&data->workers, worker->worker_id, worker);
@@ -133,7 +146,6 @@ int controller_init(controller_data_t *data) {
     ts_map_insert(&data->event_loop.handlers, INPUT_MSG_EVENT_TYPE, input_msg_event_handler);
     ts_map_insert(&data->event_loop.deleters, INPUT_MSG_EVENT_TYPE, input_msg_event_deleter);
 
-
     int rc = sqlite3_open(DB_FILENAME, &data->db);
     return rc;
 }
@@ -143,7 +155,10 @@ void controller_destroy(controller_data_t *data) {
         decrease_workers(data);
     }
     if (data->db != NULL) {
-        sqlite3_close(data->db);
+        int rc;
+        while ((rc = sqlite3_close(data->db)) != SQLITE_OK) {
+            usleep(100000); /* 100 ms */
+        }
     }
     ts_map_destroy(&data->workers, (void (*)(void *)) kill_worker);
     event_loop_destroy(&data->workers_event_loop);

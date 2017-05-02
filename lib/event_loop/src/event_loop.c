@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <event_loop.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 /* Static functions */
 
@@ -51,10 +52,8 @@ bool event_loop_iteration(event_loop_t *el, void *data) {
 void run_event_loop(event_loop_t *el, void *data) {
     bool work = true;
     while (work) {
-        while (work && !ts_queue_empty(&el->event_queue)) {
-            work = event_loop_iteration(el, data);
-        }
-        pthread_yield();
+        work = event_loop_iteration(el, data);
+        usleep(100); /* 100 us */
     }
 }
 

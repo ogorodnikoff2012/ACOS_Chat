@@ -23,3 +23,5 @@
 **/*.log
 
 examples/*
+**/.idea/*
+**/cmake-build-debug/*

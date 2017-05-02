@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 #define __strftime_buffer_size__ 80
 
@@ -24,14 +25,17 @@ static const char *__short_file_name__(const char *fname) {
                             __strftime_buffer__);
 
 #ifdef DEBUG
-#define LOG(...)    LOG_PRE; \
-                    fprintf(stderr, "<at %s:%d> ", __short_file_name__(__FILE__), __LINE__); \
-                    fprintf(stderr, ##__VA_ARGS__); \
-                    fprintf(stderr, "\n");
-#else 
-#define LOG(...)    LOG_PRE; \
-                    fprintf(stderr, ##__VA_ARGS__); \
-                    fprintf(stderr, "\n");
+#define LOG_MODULE  fprintf(stderr, "<at %s:%d> ", __short_file_name__(__FILE__), __LINE__);
+#else
+#ifndef LOG_MODULE_NAME
+#define LOG_MODULE_NAME __short_file_name__(__FILE__)
 #endif
+#define LOG_MODULE  fprintf(stderr, "[%s] ", LOG_MODULE_NAME);
+#endif
+
+#define LOG(...)    LOG_PRE; \
+                    LOG_MODULE; \
+                    fprintf(stderr, ##__VA_ARGS__); \
+                    fprintf(stderr, "\n");
 
 #endif /* XENON_CHAT_LOGGER_H */

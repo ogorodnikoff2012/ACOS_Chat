@@ -14,9 +14,9 @@ extern event_t EXIT_EVT;
 
 typedef void (* evt_handler_t)(event_t *, void *);
 
-typedef struct event_loop {
+typedef volatile struct event_loop {
     ts_map_t handlers, deleters;
-    ts_queue_t event_queue;
+    volatile ts_queue_t event_queue;
 } event_loop_t;
 
 void event_loop_init(event_loop_t *el);

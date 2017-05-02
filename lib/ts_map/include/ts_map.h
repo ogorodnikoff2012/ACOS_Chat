@@ -19,15 +19,15 @@ typedef struct ts_map {
     bool frosen;
 } ts_map_t;
 
-void ts_map_init(ts_map_t *m);
-void ts_map_destroy(ts_map_t *m, void (* destructor)(void *));
+void ts_map_init(volatile ts_map_t *m);
+void ts_map_destroy(volatile ts_map_t *m, void (* destructor)(void *));
 
-bool ts_map_insert(ts_map_t *m, uint64_t key, void *val);
-void *ts_map_find(ts_map_t *m, uint64_t key);
-void *ts_map_erase(ts_map_t *m, uint64_t key);
+bool ts_map_insert(volatile ts_map_t *m, uint64_t key, void *val);
+void *ts_map_find(volatile ts_map_t *m, uint64_t key);
+void *ts_map_erase(volatile ts_map_t *m, uint64_t key);
 
-size_t ts_map_size(ts_map_t *m);
+size_t ts_map_size(volatile ts_map_t *m);
 
-void ts_map_forall(ts_map_t *m, void *ptr, void (* callback)(uint64_t key, void *value, void *ptr));
+void ts_map_forall(volatile ts_map_t *m, void *ptr, void (* callback)(uint64_t key, void *value, void *ptr));
 
 #endif /* XENON_TS_MAP_TS_MAP_H */

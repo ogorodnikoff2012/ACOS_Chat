@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define LOCK pthread_mutex_lock(&q->mutex)
-#define UNLOCK pthread_mutex_unlock(&q->mutex)
+#define LOCK pthread_mutex_lock((pthread_mutex_t *)&q->mutex)
+#define UNLOCK pthread_mutex_unlock((pthread_mutex_t *)&q->mutex)
 
-void ts_queue_init(ts_queue_t *q) {
-    pthread_mutex_init(&q->mutex, NULL);
+void ts_queue_init(volatile ts_queue_t *q) {
+    pthread_mutex_init((pthread_mutex_t *)&q->mutex, NULL);
 
     LOCK;
     q->first = NULL;
@@ -16,7 +16,7 @@ void ts_queue_init(ts_queue_t *q) {
     UNLOCK;
 }
 
-void ts_queue_destroy(ts_queue_t *q, void (* destructor)(void *)) {
+void ts_queue_destroy(volatile ts_queue_t *q, void (* destructor)(void *)) {
     LOCK;
     while (q->first != NULL) {
         ts_queue_node_t *next = q->first->next;
@@ -29,10 +29,10 @@ void ts_queue_destroy(ts_queue_t *q, void (* destructor)(void *)) {
     q->frozen = true;
     UNLOCK;
 
-    pthread_mutex_destroy(&q->mutex);
+    pthread_mutex_destroy((pthread_mutex_t *)&q->mutex);
 }
 
-bool ts_queue_push(ts_queue_t *q, void *val) {
+bool ts_queue_push(volatile ts_queue_t *q, void *val) {
     bool success;
     ts_queue_node_t *node = calloc(1, sizeof(ts_queue_node_t));
     node->val = val;
@@ -59,7 +59,7 @@ bool ts_queue_push(ts_queue_t *q, void *val) {
     return success;
 }
 
-bool ts_queue_push_in_front(ts_queue_t *q, void *val) {
+bool ts_queue_push_in_front(volatile ts_queue_t *q, void *val) {
     bool success;
     ts_queue_node_t *node = calloc(1, sizeof(ts_queue_node_t));
     node->val = val;
@@ -86,7 +86,7 @@ bool ts_queue_push_in_front(ts_queue_t *q, void *val) {
     return success;
 }
 
-void *ts_queue_pop(ts_queue_t *q) {
+void *ts_queue_pop(volatile ts_queue_t *q) {
     void *val = NULL;
     ts_queue_node_t *node = NULL;
 
@@ -105,7 +105,7 @@ void *ts_queue_pop(ts_queue_t *q) {
     return val;
 }
 
-size_t ts_queue_size(ts_queue_t *q) {
+size_t ts_queue_size(volatile ts_queue_t *q) {
     size_t size;
     LOCK;
     size = q->size;
@@ -113,7 +113,7 @@ size_t ts_queue_size(ts_queue_t *q) {
     return size;
 }
 
-bool ts_queue_empty(ts_queue_t *q) {
+bool ts_queue_empty(volatile ts_queue_t *q) {
     size_t size;
     LOCK;
     size = q->size;

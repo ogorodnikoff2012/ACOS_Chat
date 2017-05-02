@@ -3,6 +3,7 @@
 
 #include "../event_loop/event_loop.h"
 #include "../defines.h"
+
 #include <sqlite3.h>
 
 #define WORKER_EXIT_EVENT_TYPE (((CONTROLLER_THREAD_ID) << 8) + 1)
@@ -31,5 +32,8 @@ change_worker_cnt_event_t *new_change_worker_cnt_event_t(int cnt);
 int controller_init(controller_data_t *data);
 void controller_destroy(controller_data_t *data);
 void *controller_thread(void *ptr);
+
+void send_status_code(int sockid, int status);
+void register_user(const char *login, const char *passwd);
 
 #endif /* XENON_CHAT_SERVER_CONRTOLLER_H */

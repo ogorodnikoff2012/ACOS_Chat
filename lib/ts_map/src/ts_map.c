@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#define LOCK pthread_mutex_lock(&m->mutex)
-#define UNLOCK pthread_mutex_unlock(&m->mutex)
+#define LOCK pthread_mutex_lock((pthread_mutex_t *)&m->mutex)
+#define UNLOCK pthread_mutex_unlock((pthread_mutex_t *)&m->mutex)
 
 /* Static functions */
 
@@ -232,7 +232,7 @@ static ts_map_node_t *add(ts_map_node_t *tree, uint64_t key, void *val) {
         return node;
     }
 
-    if (find(tree, key)->key == key) {
+    if ((tree = find(tree, key))->key == key) {
         return tree;
     }
 
@@ -270,8 +270,8 @@ static ts_map_node_t *remove(ts_map_node_t *tree, uint64_t key, void **val) {
 
 /* Global functions */
 
-void ts_map_init(ts_map_t *m) {
-    pthread_mutex_init(&m->mutex, NULL);
+void ts_map_init(volatile ts_map_t *m) {
+    pthread_mutex_init((pthread_mutex_t *)&m->mutex, NULL);
     
     LOCK;
     m->root = NULL;
@@ -279,16 +279,16 @@ void ts_map_init(ts_map_t *m) {
     UNLOCK;
 }
 
-void ts_map_destroy(ts_map_t *m, void (* destructor)(void *)) {
+void ts_map_destroy(volatile ts_map_t *m, void (* destructor)(void *)) {
     LOCK;
     ts_map_node_destroy(m->root, destructor);
     m->frosen = true;
     UNLOCK;
 
-    pthread_mutex_destroy(&m->mutex);
+    pthread_mutex_destroy((pthread_mutex_t *)&m->mutex);
 }
 
-bool ts_map_insert(ts_map_t *m, uint64_t key, void *val) {
+bool ts_map_insert(volatile ts_map_t *m, uint64_t key, void *val) {
     bool success;
     LOCK;
     if (m->frosen) {
@@ -301,7 +301,7 @@ bool ts_map_insert(ts_map_t *m, uint64_t key, void *val) {
     return success;
 }
 
-void *ts_map_find(ts_map_t *m, uint64_t key) {
+void *ts_map_find(volatile ts_map_t *m, uint64_t key) {
     void *ans = NULL;
     LOCK;
     m->root = find(m->root, key);
@@ -312,7 +312,7 @@ void *ts_map_find(ts_map_t *m, uint64_t key) {
     return ans;
 }
 
-void *ts_map_erase(ts_map_t *m, uint64_t key) {
+void *ts_map_erase(volatile ts_map_t *m, uint64_t key) {
     void *val = NULL;
     LOCK;
     if (!m->frosen) {
@@ -322,7 +322,7 @@ void *ts_map_erase(ts_map_t *m, uint64_t key) {
     return val;
 }
 
-size_t ts_map_size(ts_map_t *m) {
+size_t ts_map_size(volatile ts_map_t *m) {
     size_t ans;
     LOCK;
     ans = get_size(m->root);
@@ -339,7 +339,7 @@ static void ts_map_forall_helper(ts_map_node_t *m, void *ptr, void (* callback)(
     ts_map_forall_helper(m->right, ptr, callback);
 } 
 
-void ts_map_forall(ts_map_t *m, void *ptr, void (* callback)(uint64_t key, void *value, void *ptr)) {
+void ts_map_forall(volatile ts_map_t *m, void *ptr, void (* callback)(uint64_t key, void *value, void *ptr)) {
     LOCK;
     ts_map_forall_helper(m->root, ptr, callback);
     UNLOCK;
