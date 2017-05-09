@@ -6,7 +6,7 @@
 #include <ncursesw/ncurses.h>
 #include <ncursesw/form.h>
 #include <sys/time.h>
-#include "defines.h"
+#include "server/defines.h"
 
 #define MESSAGE_EVENT_TYPE (((GUI_THREAD_ID) << 8) + 1)
 #define READINPUT_EVENT_TYPE (((GUI_THREAD_ID) << 8) + 2)

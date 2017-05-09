@@ -89,7 +89,7 @@ static void gui_restart_windows(gui_data_t *data) {
 
 static void gui_print_message(gui_data_t *data, message_t *msg) {
     wattr_on(data->messages_pad, A_BOLD, NULL);
-    const char *author;
+    const char *author = NULL;
     switch (msg->type) {
         case EMT_REGULAR:
             author = msg->author;

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(chat)
 
-set(CMAKE_C_FLAGS "-std=gnu99 -g -O0 -DDEBUG")
+set(CMAKE_C_FLAGS "-std=gnu99 -g -O0 -DDEBUG -D_GNU_SOURCE")
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules/")
 
@@ -26,5 +26,8 @@ add_executable(server
         src/server/worker.c
         src/server/listener.c
         src/logger.c
-        src/server/conn_mgr.c)
+        src/server/conn_mgr.c
+        src/pascal_string.c
+        src/server/events/broadcast_message_event.c
+        src/server/events/send_message_job.c src/server/misc.c src/server/server_message.c src/server/events/process_message_job.c src/server/db.c src/server/events/input_msg_event.c src/server/events/worker_exit_event.c src/server/events/change_worker_cnt_event.c src/server/connection.c src/server/events/close_connection_event.c)
 target_link_libraries(server event_loop ts_vector xenon_md5 ${CMAKE_THREAD_LIBS_INIT} ${SQLITE3_LIBRARIES})

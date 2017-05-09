@@ -1,51 +1,10 @@
-#define _GNU_SOURCE
 #include <server/controller.h>
 #include <server/listener.h>
 #include <unistd.h>
-#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <logger.h>
-#include <xenon_md5/xenon_md5.h>
-
-static int count_callback(void *ptr, int n, char **col, char **names) {
-    *(int *) ptr = n;
-    return 0;
-}
-
-static void prepare_db(sqlite3 *db) {
-    char *errmsg;
-    int rc;
-#ifdef DEBUG
-    rc = sqlite3_exec(db, DB_RESET, NULL, NULL, &errmsg);
-    LOG("Database dropped, rc = %d, errmsg = %s", rc, errmsg);
-#endif
-    rc = sqlite3_exec(db, DB_INIT, NULL, NULL, &errmsg);
-    LOG("Database prepared, rc = %d, errmsg = %s", rc, errmsg);
-    
-    int n = 0;
-    rc = sqlite3_exec(db, "SELECT * FROM users WHERE login='root';", count_callback, &n, &errmsg);
-    LOG("'root' user search: success = %d, rc = %d, errmsg = %s", n, rc, errmsg);
-
-    if (n == 0) {
-        char *passwd = getpass("Enter password for 'root' user: ");
-        const char *tail = NULL;
-        sqlite3_stmt *stmt;
-        rc = sqlite3_prepare(db, "INSERT INTO users VALUES (?001, ?002, ?003);", -1, &stmt, &tail);
-        sqlite3_bind_int(stmt, 1, 1); /* root UID = 1 */
-        sqlite3_bind_text(stmt, 2, "root", -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, 3, md5hex(passwd), -1, free);
-
-        while ((rc = sqlite3_step(stmt)) != SQLITE_DONE) {
-            if (rc == SQLITE_ERROR) {
-                LOG("Fucking error while adding 'root' user");
-                exit(-1);
-            }
-        }
-        sqlite3_finalize(stmt);
-        free(passwd);
-    }
-}
+#include <server/db.h>
+#include <server/events/change_worker_cnt_event.h>
 
 static int prepare_conn_mgr_callback(void *ptr, int argc, char *argv[], char *col_name[]) {
     conn_mgr_t *mgr = ptr;
@@ -86,8 +45,18 @@ int main() {
     printf("Server is ready. To stop it, press Ctrl+D (send EOF).\n");
 
     while (!feof(stdin)) {
-        char c;
+        char c = '\0';
         fread(&c, 1, 1, stdin);
+        if (c == '+') {
+            send_event(&cdata.event_loop, (event_t *) new_change_worker_cnt_event(cdata.workers_cnt + 1));
+        } else if (c == '-') {
+            int new_workers_cnt = cdata.workers_cnt - 1;
+            if (new_workers_cnt > 0) {
+                send_event(&cdata.event_loop, (event_t *) new_change_worker_cnt_event(new_workers_cnt));
+            }
+        } else if (c == '?') {
+            printf("Now has %d worker%s.\n", cdata.workers_cnt, (cdata.workers_cnt == 1 ? "" : "s"));
+        }
         usleep(10000);
     }
 

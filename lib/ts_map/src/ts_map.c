@@ -36,9 +36,11 @@ static bool is_left_son(ts_map_node_t *node) {
     return node->parent != NULL && node->parent->left == node;
 }
 
+/*
 static bool is_right_son(ts_map_node_t *node) {
     return node->parent != NULL && node->parent->right == node;
 }
+*/
 
 static void connect_left(ts_map_node_t *parent, ts_map_node_t *son) {
     if (parent != NULL) {
@@ -169,12 +171,14 @@ static ts_map_node_t *find(ts_map_node_t *root, uint64_t key) {
     }
 }
 
+/*
 static ts_map_node_t *leftest(ts_map_node_t *node) {
     while (node->left != NULL) {
         node = node->left;
     }
     return node;
 }
+*/
 
 static ts_map_node_t *rightest(ts_map_node_t *node) {
     while (node->right != NULL) {

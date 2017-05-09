@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <event_loop.h>
 #include <stdlib.h>
 #include <unistd.h>
