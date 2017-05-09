@@ -20,7 +20,7 @@ static void prepare_db(sqlite3 *db) {
     rc = sqlite3_exec(db, DB_RESET, NULL, NULL, &errmsg);
     LOG("Database dropped, rc = %d, errmsg = %s", rc, errmsg);
 #endif
-    rc = sqlite3_exec(db, DB_SCHEMA, NULL, NULL, &errmsg);
+    rc = sqlite3_exec(db, DB_INIT, NULL, NULL, &errmsg);
     LOG("Database prepared, rc = %d, errmsg = %s", rc, errmsg);
     
     int n = 0;
@@ -32,7 +32,7 @@ static void prepare_db(sqlite3 *db) {
         const char *tail = NULL;
         sqlite3_stmt *stmt;
         rc = sqlite3_prepare(db, "INSERT INTO users VALUES (?001, ?002, ?003);", -1, &stmt, &tail);
-        sqlite3_bind_int(stmt, 1, 0); /* root UID = 0 */
+        sqlite3_bind_int(stmt, 1, 1); /* root UID = 1 */
         sqlite3_bind_text(stmt, 2, "root", -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 3, md5hex(passwd), -1, free);
 
@@ -47,15 +47,33 @@ static void prepare_db(sqlite3 *db) {
     }
 }
 
+static int prepare_conn_mgr_callback(void *ptr, int argc, char *argv[], char *col_name[]) {
+    conn_mgr_t *mgr = ptr;
+    if (argc > 0) {
+        conn_mgr_add_uid(mgr, atoi(argv[0]));
+        return 0;
+    }
+    return 1;
+}
+
+static void prepare_conn_mgr(sqlite3 *db, conn_mgr_t *mgr) {
+    char *errmsg = NULL;
+    sqlite3_exec(db, "SELECT uid FROM users;", prepare_conn_mgr_callback, mgr, &errmsg);
+}
+
 int main() {
     controller_data_t cdata;
     controller_init(&cdata);
 
     listener_data_t ldata;
-    ldata.controller_event_loop = &cdata.event_loop;
     listener_init(&ldata);
 
+    cdata.listener_event_loop = &ldata.event_loop;
+    ldata.controller_event_loop = &cdata.event_loop;
+    ldata.conn_mgr = &cdata.conn_mgr;
+
     prepare_db(cdata.db);
+    prepare_conn_mgr(cdata.db, &cdata.conn_mgr);
 
     pthread_t controller, listener;
     pthread_create(&controller, NULL, controller_thread, &cdata);
@@ -63,7 +81,9 @@ int main() {
     pthread_create(&listener, NULL, listener_thread, &ldata);
     pthread_setname_np(listener, "listener");
 
-    send_event(&cdata.event_loop, (event_t *) new_change_worker_cnt_event_t(5));
+    send_event(&cdata.event_loop, (event_t *) new_change_worker_cnt_event(5));
+
+    printf("Server is ready. To stop it, press Ctrl+D (send EOF).\n");
 
     while (!feof(stdin)) {
         char c;

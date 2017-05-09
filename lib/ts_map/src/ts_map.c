@@ -255,13 +255,19 @@ static ts_map_node_t *remove(ts_map_node_t *tree, uint64_t key, void **val) {
         return NULL;
     }
 
-    find(tree, key);
+    tree = find(tree, key);
     if (tree->key != key) {
         *val = NULL;
         return tree;
     }
 
     ts_map_node_t *left = tree->left, *right = tree->right;
+    if (left != NULL) {
+        left->parent = NULL;
+    }
+    if (right != NULL) {
+        right->parent = NULL;
+    }
     *val = tree->val;
     free(tree);
 
@@ -310,6 +316,15 @@ void *ts_map_find(volatile ts_map_t *m, uint64_t key) {
     }
     UNLOCK;
     return ans;
+}
+
+bool ts_map_has(volatile ts_map_t *m, uint64_t key) {
+    bool has = false;
+    LOCK;
+    m->root = find(m->root, key);
+    has = m->root != NULL && m->root->key == key;
+    UNLOCK;
+    return has;
 }
 
 void *ts_map_erase(volatile ts_map_t *m, uint64_t key) {

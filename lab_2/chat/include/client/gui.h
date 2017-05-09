@@ -3,8 +3,8 @@
 
 #include "../event_loop/ts_queue/ts_queue.h"
 #include "../event_loop/event_loop.h"
-#include <ncurses6/ncursesw/ncurses.h>
-#include <ncurses6/ncursesw/form.h>
+#include <ncursesw/ncurses.h>
+#include <ncursesw/form.h>
 #include <sys/time.h>
 #include "defines.h"
 

@@ -9,6 +9,22 @@
 #include <poll.h>
 #include <ts_vector/ts_vector.h>
 #include <sys/ioctl.h>
+#include <server/conn_mgr.h>
+
+static void close_connection(listener_data_t *, int);
+
+static void close_connection_event_handler(event_t *ptr, void *dptr) {
+    listener_data_t *data = dptr;
+    close_connection_event_t *evt = (close_connection_event_t *) ptr;
+    close_connection(data, evt->sockid);
+}
+
+close_connection_event_t *new_close_connection_event(int sockid) {
+    close_connection_event_t *evt = calloc(1, sizeof(close_connection_event_t));
+    evt->e_hdr.type = CLOSE_CONNECTION_EVENT_TYPE;
+    evt->sockid = sockid;
+    return evt;
+}
 
 input_msg_event_t *new_input_msg_event(connection_t *conn) {
     input_msg_event_t *evt = calloc(1, sizeof(input_msg_event_t));
@@ -49,12 +65,15 @@ connection_t *new_connection(int sockid) {
     conn->bytes_expected = MSG_HEADER_SIZE;
     conn->body = NULL;
     conn->header = NULL;
+    conn->in_worker = false;
     return conn;
 }
 
 bool listener_init(listener_data_t *data) {
     ts_map_init(&data->clients);
     event_loop_init(&data->event_loop);
+    ts_map_insert(&data->event_loop.handlers, CLOSE_CONNECTION_EVENT_TYPE, close_connection_event_handler);
+    data->conn_mgr = NULL;
     char *port_str = prompt("Port (leave blank for default 1337)"); 
     int port = 1337;
     if (port_str != NULL) {
@@ -115,15 +134,16 @@ static void push_back_conn(uint64_t key, void *val, void *env) {
 
 static void close_connection(listener_data_t *data, int sockid) {
     connection_t *conn = ts_map_erase(&data->clients, sockid);
+    conn_mgr_del_sid(data->conn_mgr, sockid);
     connection_deleter(conn);
     LOG("Connection closed, socket %d", sockid);
 }
-
+/*
 static void process_connection(listener_data_t *data, int sockid) {
     LOG("Incoming data, socket %d", sockid);
     connection_t *conn = ts_map_find(&data->clients, sockid);
     int count;
-    if (conn->bytes_read < 5) {
+    if (conn->bytes_read < MSG_HEADER_SIZE) {
         if (conn->header == NULL) {
             conn->header = malloc(MSG_HEADER_SIZE);
             if (conn->header == NULL) {
@@ -137,23 +157,95 @@ static void process_connection(listener_data_t *data, int sockid) {
         if (conn->body == NULL) {
             int body_size = ntohl(*(int *)(conn->header + 1));
             conn->body = malloc(body_size);
-            if (conn->body == NULL) {
-                LOG("ERROR while malloc(), closing connection");
-                close_connection(data, sockid);
-                return;
+            if (body_size > 0) {
+                if (conn->body == NULL) {
+                    LOG("ERROR while malloc(), closing connection");
+                    close_connection(data, sockid);
+                    return;
+                }
+                conn->bytes_expected += body_size;
+            } else {
+                conn->ready = true;
+                count = 0;
             }
-            conn->bytes_expected += body_size;
         }
-        count = recv(sockid, conn->body + conn->bytes_read - MSG_HEADER_SIZE,
-                     conn->bytes_expected - conn->bytes_read, 0);
+        if (!conn->ready) {
+            count = recv(sockid, conn->body + conn->bytes_read - MSG_HEADER_SIZE,
+                         conn->bytes_expected - conn->bytes_read, 0);
+        }
     }
-    if (count <= 0) {
+    if (count <= 0 && !conn->ready) {
         LOG("%s while recv(), closing connection", (count == -1 ? "ERROR" : "EOF"));
         close_connection(data, sockid);
         return;
     }
     conn->bytes_read += count;
-    if (conn->bytes_expected == conn->bytes_read && conn->bytes_expected > MSG_HEADER_SIZE) {
+    if (conn->bytes_expected == conn->bytes_read && conn->body != NULL) {
+
+    }
+    if (conn->ready) {
+        LOG("Recieved message, processing...");
+        conn->in_worker = true;
+        send_event(data->controller_event_loop, (event_t *) new_input_msg_event(conn));
+    }
+}
+*/
+
+static void process_connection(listener_data_t *data, int sockid) {
+#define BAD_COUNT   LOG("%s while recv(), closing connection", (count == -1 ? "ERROR" : "EOF")); \
+                    close_connection(data, sockid); \
+                    return;
+#define BAD_MALLOC  LOG("ERROR while malloc(), closing connection"); \
+                    close_connection(data, sockid); \
+                    return;
+
+    LOG("Incoming data, socket %d", sockid);
+    connection_t *conn = ts_map_find(&data->clients, sockid);
+    int count = 0;
+    if (conn->bytes_read < MSG_HEADER_SIZE) {
+        if (conn->header == NULL) {
+            conn->header = malloc(MSG_HEADER_SIZE);
+            if (conn->header == NULL) {
+                BAD_MALLOC;
+            }
+        }
+        count = recv(sockid, conn->header + conn->bytes_read, conn->bytes_expected - conn->bytes_read, 0);
+        if (count <= 0) {
+            BAD_COUNT;
+        }
+    };
+
+    conn->bytes_read += count;
+    if (conn->bytes_read < MSG_HEADER_SIZE) {
+        return;
+    }
+
+    int body_size = ntohl(*(int *)(conn->header + 1));
+    if (body_size < 0) {
+        LOG("Message is corrupted");
+        close_connection(data, sockid);
+        return;
+    }
+    if (body_size > 0) {
+        if (conn->body == NULL) {
+            conn->body = malloc(body_size);
+            if (conn->body == NULL) {
+                BAD_MALLOC;
+            }
+            conn->bytes_expected += body_size;
+        }
+        count = recv(sockid, conn->body + conn->bytes_read - MSG_HEADER_SIZE,
+                     conn->bytes_expected - conn->bytes_read, 0);
+        if (count <= 0) {
+            BAD_COUNT;
+        }
+
+        conn->bytes_read += count;
+    }
+
+#undef BAD_MALLOC
+#undef BAD_COUNT
+    if (conn->bytes_read == conn->bytes_expected) {
         LOG("Recieved message, processing...");
         conn->in_worker = true;
         send_event(data->controller_event_loop, (event_t *) new_input_msg_event(conn));
@@ -169,6 +261,7 @@ static void accept_connection(listener_data_t *data) {
         connection_t *conn = new_connection(sockid);
         ts_map_insert(&data->clients, sockid, conn);
         LOG("Accepted, socket %d", sockid);
+        conn_mgr_add_sid(data->conn_mgr, sockid);
     } else {
         LOG("Failed");
     }

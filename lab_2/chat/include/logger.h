@@ -17,6 +17,9 @@ static const char *__short_file_name__(const char *fname) {
     return (ptr == NULL) ? (fname) : (ptr + 1);
 }
 
+void logger_lock();
+void logger_unlock();
+
 #define LOG_PRE     time(&__cur_time__); \
                     __strftime_strlen__ = strftime(__strftime_buffer__, \
                             __strftime_buffer_size__, \
@@ -33,9 +36,11 @@ static const char *__short_file_name__(const char *fname) {
 #define LOG_MODULE  fprintf(stderr, "[%s] ", LOG_MODULE_NAME);
 #endif
 
-#define LOG(...)    LOG_PRE; \
+#define LOG(...)    logger_lock(); \
+                    LOG_PRE; \
                     LOG_MODULE; \
                     fprintf(stderr, ##__VA_ARGS__); \
-                    fprintf(stderr, "\n");
+                    fprintf(stderr, "\n"); \
+                    logger_unlock();
 
 #endif /* XENON_CHAT_LOGGER_H */

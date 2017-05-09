@@ -16,13 +16,25 @@
 #define MSG_STATUS_ACCESS_ERROR 5
 #define MSG_STATUS_INVALID_MSG 6
 
+#define MESSAGE_SERVER_REGULAR 'r'
+#define MESSAGE_SERVER_META 'm'
+#define MESSAGE_SERVER_STATUS 's'
+
+#define MESSAGE_CLIENT_REGULAR 'r'
+#define MESSAGE_CLIENT_LOGIN 'i'
+#define MESSAGE_CLIENT_LOGOUT 'o'
+
+#define NULL_UID 0
+
 #define DB_FILENAME "xenon_chat_server.sqlite"
 
 #define DB_RESET    "DROP TABLE IF EXISTS users;" \
-                    "DROP TABLE IF EXISTS conns;"
+                    "DROP TABLE IF EXISTS messages;"
 
-#define DB_SCHEMA   "CREATE TABLE IF NOT EXISTS users (id integer primary key, login nvarchar(32)," \
+#define DB_SCHEMA   "CREATE TABLE IF NOT EXISTS users (uid integer primary key, login nvarchar(32)," \
                                                         "password_hash varchar(32));" \
-                    "CREATE TABLE IF NOT EXISTS conns (uid integer, sockid integer primary key);"
+                    "CREATE TABLE IF NOT EXISTS messages (uid integer, msg text, tstamp bigint);"
+
+#define DB_INIT     DB_SCHEMA
 
 #endif /* XENON_CHAT_CLIENT_DEFINES_H */

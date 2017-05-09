@@ -24,6 +24,7 @@ void ts_map_destroy(volatile ts_map_t *m, void (* destructor)(void *));
 
 bool ts_map_insert(volatile ts_map_t *m, uint64_t key, void *val);
 void *ts_map_find(volatile ts_map_t *m, uint64_t key);
+bool ts_map_has(volatile ts_map_t *m, uint64_t key);
 void *ts_map_erase(volatile ts_map_t *m, uint64_t key);
 
 size_t ts_map_size(volatile ts_map_t *m);
