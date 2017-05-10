@@ -7,7 +7,6 @@
 
 #include <stdint.h>
 
-uint64_t pack_tstamp(uint64_t n);
 uint64_t get_tstamp();
 void send_status_code(int sockid, int status);
 uint64_t unique_id();

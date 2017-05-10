@@ -77,11 +77,11 @@ void *pack_message(server_message_t *msg) {
                 break;
             case DATA_INT64:
                 *len_ptr = sizeof(uint64_t);
-                *((uint64_t *) it) = token.data.i64;
+                *((uint64_t *) it) = htobe64(token.data.i64);
                 break;
             case DATA_INT32:
                 *len_ptr = sizeof(uint32_t);
-                *((uint32_t *) it) = token.data.i32;
+                *((uint32_t *) it) = htonl(token.data.i32);
                 break;
             case DATA_P_STR:
                 *len_ptr = token.data.p_str->length;

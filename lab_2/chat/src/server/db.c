@@ -125,7 +125,7 @@ void prepare_db(sqlite3 *db) {
         const char *tail = NULL;
         sqlite3_stmt *stmt;
         rc = sqlite3_prepare(db, "INSERT INTO users VALUES (?001, ?002, ?003);", -1, &stmt, &tail);
-        sqlite3_bind_int(stmt, 1, 1); /* root UID = 1 */
+        sqlite3_bind_int(stmt, 1, ROOT_UID);
         sqlite3_bind_text(stmt, 2, "root", -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 3, md5hex(passwd), -1, free);
 

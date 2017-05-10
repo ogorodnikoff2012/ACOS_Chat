@@ -14,6 +14,10 @@
 #include <pair.h>
 #include <server/controller.h>
 #include <server/connection.h>
+#include <server/conn_mgr.h>
+#include <ts_vector/ts_vector.h>
+#include <server/server_message.h>
+#include <pascal_string.h>
 
 process_message_job_t *new_process_message_job(connection_t *conn, server_message_t *msg) {
     process_message_job_t *job = calloc(1, sizeof(process_message_job_t));
@@ -47,7 +51,7 @@ static void browse_history_callback(void *env, sqlite3_stmt *stmt) {
     message_token_t buf_token;
 
     buf_token.type = DATA_INT64;
-    buf_token.data.i64 = pack_tstamp(tstamp);
+    buf_token.data.i64 = tstamp;
     ts_vector_push_back(tokens, &buf_token);
 
     buf_token.type = DATA_C_STR;
@@ -70,6 +74,43 @@ static void browse_history_callback(void *env, sqlite3_stmt *stmt) {
     free(package);
 }
 
+static void user_list_callback(uint64_t key, void *val, void *ptr) {
+    ts_vector_t *uids = ptr;
+    int uid = (int) key;
+    if (ts_map_size(val) != 0 && uid != NULL_UID) {
+        ts_vector_push_back(uids, &uid);
+    }
+}
+
+static void kick_callback(uint64_t key, void *value, void *ptr) {
+    int sockid = (int) key;
+    pair_t *pair = ptr;
+    event_loop_t *eloop = pair->first;
+    pascal_string_t *reason = pair->second;
+
+    message_token_t token;
+    token.type = DATA_P_STR;
+    token.data.p_str = pstrdup(reason);
+
+    ts_vector_t *tokens = calloc(1, sizeof(ts_vector_t));
+    ts_vector_init(tokens, sizeof(message_token_t));
+    ts_vector_push_back(tokens, &token);
+
+    server_message_t *msg = new_server_message(MESSAGE_SERVER_KICK, tokens);
+
+    void *package = pack_message(msg);
+    delete_server_message(msg);
+
+    int pack_len = ntohl(*(int *)(package + 1)) + MSG_HEADER_SIZE;
+    int count = send(sockid, package, pack_len, 0);
+    if (count == -1) {
+        LOG("Message sending failed");
+    }
+    free(package);
+
+    send_event(eloop, (event_t *) new_close_connection_event(sockid));
+}
+
 void process_message_job_handler(event_t *ptr, void *dptr) {
     process_message_job_t *job = (process_message_job_t *) ptr;
     worker_data_t *data = (worker_data_t *) dptr;
@@ -85,6 +126,8 @@ void process_message_job_handler(event_t *ptr, void *dptr) {
             char *passwd = p_str_to_c_str(tokens[1].data.p_str);
             int uid = login_or_register(data->controller->db, login, passwd);
             if (uid < 0) {
+                free(login);
+                free(passwd);
                 send_status_code(job->conn->sockid, -uid);
                 break;
             }
@@ -100,6 +143,8 @@ void process_message_job_handler(event_t *ptr, void *dptr) {
                            (event_t *) new_broadcast_message_event(get_tstamp(), MESSAGE_SERVER_META, NULL,
                                                                    msg, NULL_UID));
             }
+            free(login);
+            free(passwd);
         }
             break;
         case MESSAGE_CLIENT_LOGOUT: {
@@ -109,7 +154,9 @@ void process_message_job_handler(event_t *ptr, void *dptr) {
                        (event_t *) new_close_connection_event(job->conn->sockid));
             if (sessions == 1) {
                 char *msg = NULL;
-                asprintf(&msg, "User '%s' has logged out", get_login_by_uid(data->controller->db, uid));
+                char *login = get_login_by_uid(data->controller->db, uid);
+                asprintf(&msg, "User '%s' has logged out", login);
+                free(login);
                 send_event(data->controller_event_loop,
                            (event_t *) new_broadcast_message_event(get_tstamp(), MESSAGE_SERVER_META, NULL,
                                                                    msg, NULL_UID));
@@ -142,6 +189,69 @@ void process_message_job_handler(event_t *ptr, void *dptr) {
             env.first = data->controller->db;
             env.second = &job->conn->sockid;
             browse_history(data->controller->db, cnt, &env, browse_history_callback);
+        }
+            break;
+        case MESSAGE_CLIENT_LIST: {
+            ts_vector_t *users = calloc(1, sizeof(ts_vector_t));
+            ts_vector_init(users, sizeof(int));
+            ts_map_forall(&data->controller->conn_mgr.uid_to_sid, users, user_list_callback);
+
+            ts_vector_t *tokens = calloc(1, sizeof(ts_vector_t));
+            ts_vector_init(tokens, sizeof(message_token_t));
+
+            message_token_t token;
+            uint32_t *uids = (uint32_t *) users->data;
+            for (int i = 0; i < users->size; ++i) {
+                token.type = DATA_INT32;
+                token.data.i32 = uids[i];
+                ts_vector_push_back(tokens, &token);
+
+                token.type = DATA_C_STR;
+                token.data.c_str = get_login_by_uid(data->controller->db, uids[i]);
+                ts_vector_push_back(tokens, &token);
+            }
+
+            ts_vector_destroy(users);
+            free(users);
+            server_message_t *msg = new_server_message(MESSAGE_SERVER_LIST, tokens);
+
+            void *package = pack_message(msg);
+            delete_server_message(msg);
+
+            int pack_len = ntohl(*(int *)(package + 1)) + MSG_HEADER_SIZE;
+            int count = send(job->conn->sockid, package, pack_len, 0);
+            if (count == -1) {
+                LOG("Message sending failed");
+            }
+            free(package);
+        }
+            break;
+        case MESSAGE_CLIENT_KICK: {
+            int uid = conn_mgr_get_uid(&data->controller->conn_mgr, job->conn->sockid);
+            if (uid != ROOT_UID) {
+                send_status_code(job->conn->sockid, MSG_STATUS_ACCESS_ERROR);
+                break;
+            }
+            if (job->msg->tokens->size < 2 || tokens[0].data.p_str->length != 4) {
+                send_status_code(job->conn->sockid, MSG_STATUS_INVALID_MSG);
+                break;
+            }
+            int kuid = ntohl(*(int *)(tokens[0].data.p_str->data));
+            pascal_string_t *reason = tokens[1].data.p_str;
+
+            pair_t pair;
+            pair.first = (void *) data->controller->listener_event_loop;
+            pair.second = reason;
+            conn_mgr_forall_uid(&data->controller->conn_mgr, kuid, &pair, kick_callback);
+
+            char *msg = NULL;
+            char *login = get_login_by_uid(data->controller->db, kuid);
+            asprintf(&msg, "User '%s' was kicked, reason: %.*s", login, reason->length, reason->data);
+            free(login);
+            send_event(data->controller_event_loop,
+                       (event_t *) new_broadcast_message_event(get_tstamp(), MESSAGE_SERVER_META, NULL,
+                                                               msg, NULL_UID));
+
         }
             break;
         default:

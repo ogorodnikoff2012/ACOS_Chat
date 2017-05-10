@@ -28,15 +28,20 @@
 #define MESSAGE_SERVER_META 'm'
 #define MESSAGE_SERVER_STATUS 's'
 #define MESSAGE_SERVER_HISTORY 'h'
+#define MESSAGE_SERVER_LIST 'l'
+#define MESSAGE_SERVER_KICK 'k'
 
 #define MESSAGE_CLIENT_REGULAR 'r'
 #define MESSAGE_CLIENT_LOGIN 'i'
 #define MESSAGE_CLIENT_LOGOUT 'o'
 #define MESSAGE_CLIENT_HISTORY 'h'
+#define MESSAGE_CLIENT_LIST 'l'
+#define MESSAGE_CLIENT_KICK 'k'
 
 #define MAX_HISTORY_LENGTH 50
 
 #define NULL_UID 0
+#define ROOT_UID 1
 
 #define DB_FILENAME "xenon_chat_server.sqlite"
 

@@ -9,10 +9,6 @@
 #include <sys/time.h>
 #include <stdlib.h>
 
-uint64_t pack_tstamp(uint64_t n) {
-    return htobe64(n);
-}
-
 uint64_t get_tstamp() {
     struct timeval tv;
     gettimeofday(&tv, NULL);

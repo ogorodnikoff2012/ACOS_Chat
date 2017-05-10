@@ -226,17 +226,19 @@ static void split(ts_map_node_t *tree, uint64_t key,
     update_size(*right);
 }
 
-static ts_map_node_t *add(ts_map_node_t *tree, uint64_t key, void *val) {
+static ts_map_node_t *add(ts_map_node_t *tree, uint64_t key, void *val, bool *success) {
     if (tree == NULL) {
         ts_map_node_t *node = calloc(1, sizeof(ts_map_node_t));
         node->left = node->right = node->parent = NULL;
         node->key = key;
         node->val = val;
         node->size = 1;
+        *success = true;
         return node;
     }
 
     if ((tree = find(tree, key))->key == key) {
+        *success = false;
         return tree;
     }
 
@@ -250,6 +252,7 @@ static ts_map_node_t *add(ts_map_node_t *tree, uint64_t key, void *val) {
     connect_left(root, root->left);
     connect_right(root, root->right);
     update_size(root);
+    *success = true;
     return root;
 }
 
@@ -304,8 +307,7 @@ bool ts_map_insert(volatile ts_map_t *m, uint64_t key, void *val) {
     if (m->frosen) {
         success = false;
     } else {
-        m->root = add(m->root, key, val);
-        success = true;
+        m->root = add(m->root, key, val, &success);
     }
     UNLOCK;
     return success;

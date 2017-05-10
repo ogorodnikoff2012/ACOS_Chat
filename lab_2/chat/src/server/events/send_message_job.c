@@ -20,7 +20,7 @@ void send_message_job_handler(event_t *ptr, void *dptr) {
     message_token_t buf_token;
 
     buf_token.type = DATA_INT64;
-    buf_token.data.i64 = pack_tstamp(job->tstamp);
+    buf_token.data.i64 = job->tstamp;
 
     ts_vector_push_back(tokens, &buf_token);
     if (job->type == MESSAGE_SERVER_REGULAR) {
