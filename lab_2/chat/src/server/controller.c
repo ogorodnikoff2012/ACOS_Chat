@@ -1,7 +1,7 @@
 #include <server/controller.h>
 #include <server/worker.h>
 #include <stdlib.h>
-#include <logger.h>
+#include <common/logger.h>
 #include <unistd.h>
 #include <server/events/broadcast_message_event.h>
 #include <server/misc.h>

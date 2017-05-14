@@ -4,7 +4,8 @@
 #include "../event_loop/event_loop.h"
 #include "conn_mgr.h"
 #include "defines.h"
-#include "connection.h"
+#include "common/connection.h"
+#include "controller.h"
 
 typedef struct {
     event_loop_t *controller_event_loop;
@@ -12,6 +13,7 @@ typedef struct {
     connection_t server_socket;
     ts_map_t clients;
     conn_mgr_t *conn_mgr;
+    controller_data_t *controller;
 } listener_data_t;
 
 void close_connection(listener_data_t *data, int sockid);

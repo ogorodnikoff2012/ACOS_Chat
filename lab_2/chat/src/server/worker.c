@@ -1,6 +1,6 @@
 #include <server/worker.h>
 #include <stdio.h>
-#include <logger.h>
+#include <common/logger.h>
 #include <stdlib.h>
 #include <server/events/send_message_job.h>
 #include <server/events/process_message_job.h>

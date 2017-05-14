@@ -4,7 +4,7 @@
 
 #include <server/events/process_message_job.h>
 #include <server/worker.h>
-#include <logger.h>
+#include <common/logger.h>
 #include <server/misc.h>
 #include <server/events/broadcast_message_event.h>
 #include <server/db.h>
@@ -13,13 +13,13 @@
 #include <netinet/in.h>
 #include <pair.h>
 #include <server/controller.h>
-#include <server/connection.h>
+#include <common/connection.h>
 #include <server/conn_mgr.h>
 #include <ts_vector/ts_vector.h>
-#include <server/server_message.h>
-#include <pascal_string.h>
+#include <common/message.h>
+#include <common/pascal_string.h>
 
-process_message_job_t *new_process_message_job(connection_t *conn, server_message_t *msg) {
+process_message_job_t *new_process_message_job(connection_t *conn, message_t *msg) {
     process_message_job_t *job = calloc(1, sizeof(process_message_job_t));
     job->e_hdr.type = PROCESS_MESSAGE_JOB_TYPE;
     job->msg = msg;
@@ -30,7 +30,7 @@ process_message_job_t *new_process_message_job(connection_t *conn, server_messag
 
 void process_message_job_deleter(event_t *ptr) {
     process_message_job_t *job = (process_message_job_t *) ptr;
-    delete_server_message(job->msg);
+    delete_message(job->msg);
     job->conn->in_worker = false;
     free(job);
 }
@@ -62,16 +62,9 @@ static void browse_history_callback(void *env, sqlite3_stmt *stmt) {
     buf_token.data.c_str = msg;
     ts_vector_push_back(tokens, &buf_token);
 
-    server_message_t *s_msg = new_server_message(MESSAGE_SERVER_HISTORY, tokens);
-    void *package = pack_message(s_msg);
-    delete_server_message(s_msg);
-
-    int pack_len = ntohl(*(int *)(package + 1)) + MSG_HEADER_SIZE;
-    int count = send(sid, package, pack_len, 0);
-    if (count == -1) {
-        LOG("Message sending failed");
-    }
-    free(package);
+    message_t *s_msg = new_message(MESSAGE_SERVER_HISTORY, tokens);
+    send_message(s_msg, sid);
+    delete_message(s_msg);
 }
 
 static void user_list_callback(uint64_t key, void *val, void *ptr) {
@@ -96,17 +89,10 @@ static void kick_callback(uint64_t key, void *value, void *ptr) {
     ts_vector_init(tokens, sizeof(message_token_t));
     ts_vector_push_back(tokens, &token);
 
-    server_message_t *msg = new_server_message(MESSAGE_SERVER_KICK, tokens);
+    message_t *msg = new_message(MESSAGE_SERVER_KICK, tokens);
 
-    void *package = pack_message(msg);
-    delete_server_message(msg);
-
-    int pack_len = ntohl(*(int *)(package + 1)) + MSG_HEADER_SIZE;
-    int count = send(sockid, package, pack_len, 0);
-    if (count == -1) {
-        LOG("Message sending failed");
-    }
-    free(package);
+    send_message(msg, sockid);
+    delete_message(msg);
 
     send_event(eloop, (event_t *) new_close_connection_event(sockid));
 }
@@ -148,19 +134,8 @@ void process_message_job_handler(event_t *ptr, void *dptr) {
         }
             break;
         case MESSAGE_CLIENT_LOGOUT: {
-            int uid = conn_mgr_get_uid(&data->controller->conn_mgr, job->conn->sockid);
-            int sessions = conn_mgr_get_number_of_sessions(&data->controller->conn_mgr, uid);
             send_event(data->controller->listener_event_loop,
                        (event_t *) new_close_connection_event(job->conn->sockid));
-            if (sessions == 1) {
-                char *msg = NULL;
-                char *login = get_login_by_uid(data->controller->db, uid);
-                asprintf(&msg, "User '%s' has logged out", login);
-                free(login);
-                send_event(data->controller_event_loop,
-                           (event_t *) new_broadcast_message_event(get_tstamp(), MESSAGE_SERVER_META, NULL,
-                                                                   msg, NULL_UID));
-            }
         }
             break;
         case MESSAGE_CLIENT_REGULAR: {
@@ -213,17 +188,10 @@ void process_message_job_handler(event_t *ptr, void *dptr) {
 
             ts_vector_destroy(users);
             free(users);
-            server_message_t *msg = new_server_message(MESSAGE_SERVER_LIST, tokens);
+            message_t *msg = new_message(MESSAGE_SERVER_LIST, tokens);
 
-            void *package = pack_message(msg);
-            delete_server_message(msg);
-
-            int pack_len = ntohl(*(int *)(package + 1)) + MSG_HEADER_SIZE;
-            int count = send(job->conn->sockid, package, pack_len, 0);
-            if (count == -1) {
-                LOG("Message sending failed");
-            }
-            free(package);
+            send_message(msg, job->conn->sockid);
+            delete_message(msg);
         }
             break;
         case MESSAGE_CLIENT_KICK: {
@@ -237,6 +205,13 @@ void process_message_job_handler(event_t *ptr, void *dptr) {
                 break;
             }
             int kuid = ntohl(*(int *)(tokens[0].data.p_str->data));
+
+            bool is_logged_in = conn_mgr_get_number_of_sessions(&data->controller->conn_mgr, kuid) > 0;
+            if (!is_logged_in) {
+                send_status_code(job->conn->sockid, MSG_STATUS_UNAUTHORIZED);
+                break;
+            }
+
             pascal_string_t *reason = tokens[1].data.p_str;
 
             pair_t pair;

@@ -8,7 +8,7 @@
 #include <server/defines.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <logger.h>
+#include <common/logger.h>
 #include <server/misc.h>
 
 int login_or_register(sqlite3 *db, char *login, char *passwd) {

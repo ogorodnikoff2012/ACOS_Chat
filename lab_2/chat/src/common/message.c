@@ -2,15 +2,17 @@
 // Created by xenon on 09.05.17.
 //
 
-#include <server/server_message.h>
+#include <common/message.h>
 #include <ts_vector/ts_vector.h>
 #include <stdlib.h>
 #include <server/defines.h>
 #include <string.h>
-#include <logger.h>
+#include <common/logger.h>
 #include <netinet/in.h>
+#include <error.h>
+#include <errno.h>
 
-void delete_server_message(server_message_t *msg) {
+void delete_message(message_t *msg) {
     for (int i = 0; i < msg->tokens->size; ++i) {
         message_token_t token = ((message_token_t *) (msg->tokens->data))[i];
         switch (token.type) {
@@ -33,7 +35,7 @@ void delete_server_message(server_message_t *msg) {
     free(msg);
 }
 
-void *pack_message(server_message_t *msg) {
+void *pack_message(message_t *msg) {
     uint32_t size = MSG_HEADER_SIZE;
     for (int i = 0; i < msg->tokens->size; ++i) {
         size += 4;
@@ -97,9 +99,66 @@ void *pack_message(server_message_t *msg) {
     return buffer;
 }
 
-server_message_t *new_server_message(char msg_type, ts_vector_t *tokens) {
-    server_message_t *msg = calloc(1, sizeof(server_message_t));
+message_t *new_message(char msg_type, ts_vector_t *tokens) {
+    message_t *msg = calloc(1, sizeof(message_t));
     msg->msg_type = msg_type;
     msg->tokens = tokens;
     return msg;
+}
+
+message_t *unpack_message_2(char *header, char *body) {
+    int msglen = ntohl(*(int *)(header + 1));
+
+    ts_vector_t *tokens = calloc(1, sizeof(ts_vector_t));
+    ts_vector_init(tokens, sizeof(message_token_t));
+
+    char *iter = body, *end = body + msglen;
+
+    while (iter < end) {
+        pascal_string_t *str = (pascal_string_t *) iter;
+        str->length = ntohl(str->length);
+        char *next = iter + sizeof(uint32_t) + str->length;
+        if (next > end) {
+            LOG("Message corrupted");
+            for (int i = 0; i < tokens->size; ++i) {
+                free(((message_token_t *) tokens->data)[i].data.p_str);
+            }
+            ts_vector_destroy(tokens);
+            free(tokens);
+            return NULL;
+        }
+        message_token_t token;
+        token.type = DATA_P_STR;
+        token.data.p_str = pstrdup(str);
+        ts_vector_push_back(tokens, &token);
+        iter = next;
+    }
+
+    return new_message(header[0], tokens);
+}
+
+message_t *unpack_message_1(char *data) {
+    return unpack_message_2(data, data + MSG_HEADER_SIZE);
+}
+
+void send_message(message_t *msg, int sockid) {
+    void *package = pack_message(msg);
+
+    int pack_len = ntohl(*(int *)(package + 1)) + MSG_HEADER_SIZE;
+    int count = send(sockid, package, pack_len, MSG_NOSIGNAL);
+    if (count == -1) {
+        LOG("Message sending failed, error: %s", strerror(errno));
+    }
+    free(package);
+}
+
+void send_status_code(int sockid, int status) {
+    char buffer[MSG_HEADER_SIZE + 2 * sizeof(uint32_t)];
+    buffer[0] = 's';
+    *(int *)(buffer + 1) = htonl(2 * sizeof(uint32_t));
+    *(int *)(buffer + 5) = htonl(sizeof(uint32_t)); /* Yes, I know that magic constants are awful  */
+    *(int *)(buffer + 9) = htonl(status);
+
+    int stat = send(sockid, buffer, MSG_HEADER_SIZE + 2 * sizeof(uint32_t), 0);
+    LOG("Sent status code, result = %d", stat);
 }

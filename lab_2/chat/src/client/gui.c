@@ -4,13 +4,16 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-
-#define KEY_ALTERNATE_BACKSPACE 127
-
-#define INPUT_WINDOW_HEIGHT 10
-
-#define MESSAGE_PAD_WIDTH 120
-#define MESSAGE_PAD_HEIGHT 2000
+#include <client/events/readinput_event.h>
+#include <client/parsed_message.h>
+#include <client/misc.h>
+#include <client/events/display_parsed_message_job.h>
+#include <client/events/send_message_to_server_job.h>
+#include <client/defines.h>
+#include <client/events/hangup_event.h>
+#include <pair.h>
+#include <common/message.h>
+#include <client/controller.h>
 
 static int max(int a, int b) {
     return a < b ? b : a;
@@ -57,7 +60,7 @@ static void gui_init_windows(gui_data_t *data) {
     post_form(data->input_form);
 
     wprintw(data->statusbar,
-            "Xenon chat v0.1 @ Press F1 to exit, Shift+Enter to send message");
+            "Xenon chat v0.1 @ Press F10 to exit, F1 to print help and Enter to send message");
 
     wrefresh(data->messages);
     prefresh(data->messages_pad, data->line, 0,
@@ -87,171 +90,36 @@ static void gui_restart_windows(gui_data_t *data) {
     gui_init_windows(data);
 }
 
-static void gui_print_message(gui_data_t *data, message_t *msg) {
+void gui_print_message(gui_data_t *data, parsed_message_t *msg) {
     wattr_on(data->messages_pad, A_BOLD, NULL);
     const char *author = NULL;
     switch (msg->type) {
-        case EMT_REGULAR:
+        case MESSAGE_SERVER_REGULAR:
+        case MESSAGE_SERVER_HISTORY:
             author = msg->author;
             break;
-        case EMT_SERVER:
+        case MESSAGE_SERVER_META:
             author = "<SERVER>";
             break;
-        case EMT_INTERNAL:
+        case MESSAGE_CLIENT_INTERNAL:
             author = "<INTERNAL>";
             break;
+        case MESSAGE_SERVER_LIST:
+            author = "<USERLIST>";
+            break;
     }
-    wprintw(data->messages_pad, "%s, %s", author, ctime(&msg->tv.tv_sec));
+    struct timeval tv = parse_tstamp(msg->tstamp);
+    wprintw(data->messages_pad, "%s, %s", author, ctime(&tv.tv_sec));
     wattr_off(data->messages_pad, A_BOLD, NULL);
-    wprintw(data->messages_pad, "%s\n", msg->msg);
-}
-
-static void message_event_handler(event_t *ptr, void *dptr) {
-    message_event_t *evt = (message_event_t *) ptr;
-    gui_data_t *data = (gui_data_t *) dptr;
-    gui_print_message(data, evt->msg);
-    data->redraw_messages = true;
-}
-
-static void message_event_deleter(event_t *ptr) {
-    message_event_t *evt = (message_event_t *) ptr;
-    free_message(evt->msg);
-    free(evt);
-}
-
-message_event_t *new_message_event(message_t *msg) {
-    message_event_t *evt = calloc(1, sizeof(message_event_t));
-    evt->e_hdr.type = MESSAGE_EVENT_TYPE;
-    evt->msg = msg;
-    return evt;
-}
-
-static char *str_strip(const char *str) {
-    char *buf = calloc(strlen(str) + 1, sizeof(char));
-    char *buf_it = buf;
-    char prev = '\n';
-    for (const char *it = str; *it != 0; ++it) {
-        bool copy = true;
-        if (*it == prev && prev <= ' ') {
-            copy = false;
-        }
-        if (copy) {
-            *buf_it++ = *it;
-        }
-        prev = *it;
-    }
-    return buf;
-}
-
-static void readinput_event_handler(event_t *ptr, void *dptr) {
-    readinput_event_t *evt = (readinput_event_t *) ptr;
-    gui_data_t *data = (gui_data_t *) dptr;
-    
-    /* Setting up dialog window */
-
-    FIELD *field[2];
-    FORM *form;
-    WINDOW *dialog;
-
-    int dialog_height = 7;
-    int dialog_width = 60;
-    int dialog_y = (data->scr_height - dialog_height) >> 1;
-    int dialog_x = (data->scr_width - dialog_width) >> 1;
-
-    int field_height = 1;
-    int field_width = 50;
-    int field_y = 4;
-    int field_x = (dialog_width - field_width) >> 1;
-
-    int prompt_y = 2;
-    int prompt_x = field_x;    
-
-    field[0] = new_field(field_height, field_width, field_y, field_x, 0, 0);
-    field[1] = NULL;
-
-    set_field_back(field[0], A_UNDERLINE);
-    field_opts_off(field[0], O_AUTOSKIP);
-    if (evt->passwd) {
-        field_opts_off(field[0], O_PUBLIC);
-    }
-    form = new_form(field);
-
-    dialog = newwin(dialog_height, dialog_width, dialog_y, dialog_x);
-    keypad(dialog, TRUE);
-
-    set_form_win(form, dialog);
-    set_form_sub(form, derwin(dialog, dialog_height - 2, 
-                dialog_width - 2, 1, 1));
-
-    box(dialog, 0, 0);
-    post_form(form);
-
-    mvwprintw(dialog, prompt_y, prompt_x, "%s", evt->prompt);
-    wrefresh(dialog);
-
-    /* keyboard handling */
-
-    int ch;
-    while ((ch = wgetch(dialog)) != '\n' && ch != KEY_F(1)) {
-        switch (ch) {
-            case KEY_LEFT:
-                form_driver(form, REQ_PREV_CHAR);
-                break;
-            case KEY_RIGHT:
-                form_driver(form, REQ_NEXT_CHAR);
-                break;
-            case KEY_BACKSPACE:
-            case KEY_ALTERNATE_BACKSPACE:
-                form_driver(form, REQ_PREV_CHAR);
-            case KEY_DC:
-                form_driver(form, REQ_DEL_CHAR);
-                break;
-            default:
-                form_driver(form, ch);
-                break;
-        }
-    }
-
-    /* final handling */
-
-    if (ch == '\n') {
-        form_driver(form, REQ_NEXT_FIELD);
-        evt->callback_success(str_strip(field_buffer(field[0], 0)), dptr);
-    } else {
-        evt->callback_error(dptr);
-    }
-
-    unpost_form(form);
-    delwin(form_sub(form));
-    free_form(form);
-    free_field(field[0]);
-    delwin(dialog);
-}
-
-static void readinput_event_deleter(event_t *ptr) {
-    readinput_event_t *evt = (readinput_event_t *) ptr;
-    free(evt->prompt);
-    free(evt);
-}
-
-readinput_event_t *new_readinput_event(char *prompt, bool passwd,
-        void (*callback_success)(char *, void *), 
-        void (*callback_error)(void *)) {
-    readinput_event_t *evt = calloc(1, sizeof(readinput_event_t));
-    evt->e_hdr.type = READINPUT_EVENT_TYPE;
-    evt->prompt = prompt;
-    evt->passwd = passwd;
-    evt->callback_success = callback_success;
-    evt->callback_error = callback_error;
-    return evt;
+    wprintw(data->messages_pad, "%s\n", msg->text);
 }
 
 void gui_init(gui_data_t *data) {
     event_loop_init(&data->event_loop);
-    ts_map_insert(&data->event_loop.handlers, MESSAGE_EVENT_TYPE,
-            message_event_handler);
-    ts_map_insert(&data->event_loop.deleters, MESSAGE_EVENT_TYPE,
-            message_event_deleter);
+    ts_map_insert(&data->event_loop.handlers, DISPLAY_PARSED_MESSAGE_JOB_TYPE,
+            display_parsed_message_job_handler);
+    ts_map_insert(&data->event_loop.deleters, DISPLAY_PARSED_MESSAGE_JOB_TYPE,
+            display_parsed_message_job_deleter);
     ts_map_insert(&data->event_loop.handlers, READINPUT_EVENT_TYPE,
             readinput_event_handler);
     ts_map_insert(&data->event_loop.deleters, READINPUT_EVENT_TYPE,
@@ -276,12 +144,52 @@ void gui_destroy(gui_data_t *data) {
     event_loop_destroy(&data->event_loop);
 }
 
+static void get_kick_reason_success(char *s, void *ptr) {
+    pair_t *p = ptr;
+    gui_data_t *data = p->first;
+    char *uid_str = p->second;
+    int uid = atoi(uid_str);
+    free(uid_str);
+
+    ts_vector_t *tokens = calloc(1, sizeof(ts_vector_t));
+    ts_vector_init(tokens, sizeof(message_token_t));
+    message_token_t token;
+
+    token.type = DATA_INT32;
+    token.data.i32 = uid;
+    ts_vector_push_back(tokens, &token);
+
+    token.type = DATA_C_STR;
+    token.data.c_str = s;
+    ts_vector_push_back(tokens, &token);
+
+    message_t *msg = new_message(MESSAGE_CLIENT_KICK, tokens);
+    send_message(msg, data->controller->sockid);
+    delete_message(msg);
+    free(p);
+}
+
+static void get_kick_reason_failure(void *ptr) {
+    pair_t *p = ptr;
+    free(p->second);
+    free(p);
+}
+
+static void get_kick_uid_callback(char *s, void *ptr) {
+    gui_data_t *data = ptr;
+    pair_t *p = calloc(1, sizeof(pair_t));
+    p->first = data;
+    p->second = s;
+    send_event(&data->event_loop, (event_t *) new_readinput_event(
+            strdup("Enter kicking reason:"), false, p, get_kick_reason_success, get_kick_reason_failure));
+}
+
 void *gui_thread(void *raw_ptr) {
     gui_data_t *data = (gui_data_t *) raw_ptr;
 
     int ch;
     bool work = true;
-    while ((ch = wgetch(data->input_inner)) != KEY_F(1) && work) {
+    while ((ch = wgetch(data->input_inner)) != KEY_CLOSE_APP && work) {
         if (ch != ERR) {
             switch (ch) {
                 case KEY_DOWN:
@@ -313,15 +221,28 @@ void *gui_thread(void *raw_ptr) {
                 case KEY_DC:
                     form_driver(data->input_form, REQ_DEL_CHAR);
                     break;
-                case KEY_ENTER: {
-                        form_driver(data->input_form, REQ_NEXT_FIELD);
-                        char *s = str_strip(field_buffer(data->input_field[0], 0));
-                        wprintw(data->messages_pad, "=====\n%s\n", s);
-                        free(s);
-                        data->redraw_messages = true;
-                        form_driver(data->input_form, REQ_CLR_FIELD);
-                        break; 
-                    }
+                case '\n': {
+                    form_driver(data->input_form, REQ_NEXT_FIELD);
+                    char *s = str_strip(field_buffer(data->input_field[0], 0));
+                    form_driver(data->input_form, REQ_CLR_FIELD);
+                    send_event(data->controller_event_loop, (event_t *) new_send_message_to_server_job(s));
+                }
+                    break;
+                case KEY_PRINT_HELP: {
+                    send_event(&data->event_loop, (event_t *) new_display_parsed_message_job(new_parsed_message(
+                            MESSAGE_CLIENT_INTERNAL, NULL, strdup(HELP_MSG), get_tstamp()
+                    )));
+                }
+                    break;
+                case KEY_LIST_USERS: {
+                    ask_for_userlist(data->controller);
+                }
+                    break;
+                case KEY_KICK_USERS: {
+                    send_event(&data->event_loop, (event_t *) new_readinput_event(
+                            strdup("Enter UID:"), false, data, get_kick_uid_callback, NULL));
+                }
+                    break;
                 default:
                     form_driver(data->input_form, ch);
                     break;
@@ -344,34 +265,3 @@ void *gui_thread(void *raw_ptr) {
 
     pthread_exit(NULL);
 }
-
-message_t *new_regular_message(char *author, char *msg, struct timeval tv) {
-    return new_message(EMT_REGULAR, author, msg, tv);
-}
-
-message_t *new_internal_message(char *msg, struct timeval tv) {
-    return new_message(EMT_INTERNAL, NULL, msg, tv);
-}
-
-message_t *new_server_message(char *msg, struct timeval tv) {
-    return new_message(EMT_SERVER, NULL, msg, tv);
-}
-
-message_t *new_message(msg_type_t type, char *author, char *msg,
-        struct timeval tv) {
-    message_t *m = (message_t *)calloc(1, sizeof(message_t));
-    m->type = type;
-    m->author = author;
-    m->msg = msg;
-    m->tv = tv;
-    return m;
-}
-
-void free_message(message_t *msg) {
-    if (msg->author != NULL) {
-        free(msg->author);
-    }
-    free(msg->msg);
-    free(msg);
-}
-

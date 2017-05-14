@@ -6,7 +6,7 @@
 #include "../ts_vector/ts_vector.h"
 #include "defines.h"
 #include "listener.h"
-#include "../pascal_string.h"
+#include "common/pascal_string.h"
 #include "controller.h"
 
 typedef struct worker_data {

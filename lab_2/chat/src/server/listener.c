@@ -1,15 +1,17 @@
 #include <server/listener.h>
-#include <logger.h>
+#include <common/logger.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <poll.h>
 #include <ts_vector/ts_vector.h>
-#include <server/connection.h>
+#include <common/connection.h>
 #include <server/events/input_msg_event.h>
 #include <server/events/close_connection_event.h>
 #include <server/misc.h>
+#include <server/db.h>
+#include <server/events/broadcast_message_event.h>
 
 bool listener_init(listener_data_t *data) {
     ts_map_init(&data->clients);
@@ -71,10 +73,23 @@ static void push_back_conn(uint64_t key, void *val, void *env) {
 }
 
 void close_connection(listener_data_t *data, int sockid) {
+    int uid = conn_mgr_get_uid(&data->controller->conn_mgr, sockid);
+    int sessions = conn_mgr_get_number_of_sessions(&data->controller->conn_mgr, uid);
+
     connection_t *conn = ts_map_erase(&data->clients, sockid);
     conn_mgr_del_sid(data->conn_mgr, sockid);
     connection_deleter(conn);
     LOG("Connection closed, socket %d", sockid);
+
+    if (sessions == 1) {
+        char *msg = NULL;
+        char *login = get_login_by_uid(data->controller->db, uid);
+        asprintf(&msg, "User '%s' has logged out", login);
+        free(login);
+        send_event(data->controller_event_loop,
+                   (event_t *) new_broadcast_message_event(get_tstamp(), MESSAGE_SERVER_META, NULL,
+                                                           msg, NULL_UID));
+    }
 }
 
 static void process_connection(listener_data_t *data, int sockid) {

@@ -7,7 +7,7 @@
 
 #include "../../event_loop/event_loop.h"
 #include "../defines.h"
-#include "../connection.h"
+#include "common/connection.h"
 
 typedef struct {
     event_t e_hdr;

@@ -5,9 +5,9 @@
 #include <server/events/send_message_job.h>
 #include <server/worker.h>
 #include <stdlib.h>
-#include <server/server_message.h>
+#include <common/message.h>
 #include <netinet/in.h>
-#include <logger.h>
+#include <common/logger.h>
 #include <server/misc.h>
 
 void send_message_job_handler(event_t *ptr, void *dptr) {
@@ -32,16 +32,9 @@ void send_message_job_handler(event_t *ptr, void *dptr) {
     buf_token.data.c_str = job->msg;
     ts_vector_push_back(tokens, &buf_token);
 
-    server_message_t *msg = new_server_message(job->type, tokens);
-    void *package = pack_message(msg);
-    delete_server_message(msg);
-
-    int pack_len = ntohl(*(int *)(package + 1)) + MSG_HEADER_SIZE;
-    int count = send(job->sid, package, pack_len, 0);
-    if (count == -1) {
-        LOG("Message sending failed");
-    }
-    free(package);
+    message_t *msg = new_message(job->type, tokens);
+    send_message(msg, job->sid);
+    delete_message(msg);
 }
 
 send_message_job_t *new_send_message_job(int sid, uint64_t tstamp, char type, char *login, char *msg) {

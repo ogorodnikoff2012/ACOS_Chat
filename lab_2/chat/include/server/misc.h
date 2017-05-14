@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 uint64_t get_tstamp();
-void send_status_code(int sockid, int status);
 uint64_t unique_id();
 char *prompt(const char *str);
 int to_range(int min, int val, int max);

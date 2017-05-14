@@ -30,6 +30,7 @@ int main() {
     cdata.listener_event_loop = &ldata.event_loop;
     ldata.controller_event_loop = &cdata.event_loop;
     ldata.conn_mgr = &cdata.conn_mgr;
+    ldata.controller = &cdata;
 
     prepare_db(cdata.db);
     prepare_conn_mgr(cdata.db, &cdata.conn_mgr);

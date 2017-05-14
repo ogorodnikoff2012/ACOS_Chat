@@ -5,7 +5,7 @@
 #include <server/misc.h>
 #include <netinet/in.h>
 #include <server/defines.h>
-#include <logger.h>
+#include <common/logger.h>
 #include <sys/time.h>
 #include <stdlib.h>
 
@@ -15,17 +15,6 @@ uint64_t get_tstamp() {
     uint64_t tstamp = tv.tv_sec;
     tstamp <<= 32;
     return tstamp | (uint32_t) (tv.tv_usec);
-}
-
-void send_status_code(int sockid, int status) {
-    char buffer[MSG_HEADER_SIZE + 2 * sizeof(uint32_t)];
-    buffer[0] = 's';
-    *(int *)(buffer + 1) = htonl(2 * sizeof(uint32_t));
-    *(int *)(buffer + 5) = htonl(sizeof(uint32_t)); /* Yes, I know that magic constants are awful  */
-    *(int *)(buffer + 9) = htonl(status);
-
-    int stat = send(sockid, buffer, MSG_HEADER_SIZE + 2 * sizeof(uint32_t), 0);
-    LOG("Sent status code, result = %d", stat);
 }
 
 uint64_t unique_id() {

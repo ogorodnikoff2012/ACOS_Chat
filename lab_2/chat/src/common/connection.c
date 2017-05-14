@@ -2,7 +2,7 @@
 // Created by xenon on 09.05.17.
 //
 
-#include <server/connection.h>
+#include <common/connection.h>
 #include <server/defines.h>
 #include <unistd.h>
 #include <stdlib.h>
