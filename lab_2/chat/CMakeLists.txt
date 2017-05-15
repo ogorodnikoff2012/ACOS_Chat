@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(chat)
 
-set(CMAKE_C_FLAGS "-std=gnu99 -g -O0 -DDEBUG -D_GNU_SOURCE")
+set(CMAKE_C_FLAGS "-std=gnu99 -D_GNU_SOURCE -g -O0 -DDEBUG")
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules/")
 

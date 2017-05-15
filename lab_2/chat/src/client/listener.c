@@ -97,10 +97,15 @@ static void process_connection(client_listener_data_t *data, int sockid) {
             case MESSAGE_SERVER_LIST:
                 send_event(&data->controller->event_loop, (event_t *) new_list_event(msg));
                 break;
-            case MESSAGE_SERVER_STATUS:
+            case MESSAGE_SERVER_STATUS: {
+                uint32_t status = 0;
+                if (msg->tokens->size > 0) {
+                    status = htonl(* (uint32_t *) tokens[0].data.p_str->data);
+                }
                 send_event(&data->controller->event_loop,
-                           (event_t *) new_status_event(htonl(* (uint32_t *) tokens[0].data.p_str->data)));
+                           (event_t *) new_status_event(status));
                 delete_message(msg);
+            }
                 break;
             default:
                 delete_message(msg);
