@@ -1,7 +1,9 @@
 #ifndef XENON_TS_MAP_TS_MAP_H
 #define XENON_TS_MAP_TS_MAP_H
 
+#ifndef TS_NO_THREADS
 #include <pthread.h>
+#endif
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -15,7 +17,9 @@ typedef struct ts_map_node {
 
 typedef struct ts_map {
     ts_map_node_t *root;
+#ifndef TS_NO_THREADS
     pthread_mutex_t mutex;
+#endif
     bool frosen;
 } ts_map_t;
 

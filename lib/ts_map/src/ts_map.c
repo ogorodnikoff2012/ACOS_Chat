@@ -2,8 +2,13 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#ifndef TS_NO_THREADS
 #define LOCK pthread_mutex_lock((pthread_mutex_t *)&m->mutex)
 #define UNLOCK pthread_mutex_unlock((pthread_mutex_t *)&m->mutex)
+#else
+#define LOCK
+#define UNLOCK
+#endif
 
 /* Static functions */
 
@@ -284,8 +289,10 @@ static ts_map_node_t *remove(ts_map_node_t *tree, uint64_t key, void **val) {
 /* Global functions */
 
 void ts_map_init(volatile ts_map_t *m) {
+#ifndef TS_NO_THREADS
     pthread_mutex_init((pthread_mutex_t *)&m->mutex, NULL);
-    
+#endif
+
     LOCK;
     m->root = NULL;
     m->frosen = false;
@@ -298,7 +305,9 @@ void ts_map_destroy(volatile ts_map_t *m, void (* destructor)(void *)) {
     m->frosen = true;
     UNLOCK;
 
+#ifndef TS_NO_THREADS
     pthread_mutex_destroy((pthread_mutex_t *)&m->mutex);
+#endif
 }
 
 bool ts_map_insert(volatile ts_map_t *m, uint64_t key, void *val) {

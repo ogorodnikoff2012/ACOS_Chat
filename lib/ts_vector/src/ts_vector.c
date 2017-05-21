@@ -2,13 +2,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef TS_NO_THREADS
+#define LOCK
+#define UNLOCK
+#else
 #define LOCK pthread_mutex_lock(&v->mutex)
 #define UNLOCK pthread_mutex_unlock(&v->mutex)
+#endif
 
 #define INITIAL_CAPACITY 8
- 
+
 void ts_vector_init(ts_vector_t *v, size_t elem_size) {
+#ifndef TS_NO_THREADS
     pthread_mutex_init(&v->mutex, NULL);
+#endif
 
     LOCK;
     v->elem_size = elem_size;
@@ -20,9 +27,13 @@ void ts_vector_init(ts_vector_t *v, size_t elem_size) {
 
 void ts_vector_destroy(ts_vector_t *v) {
     LOCK;
-    free(v->data);
+    if (v->data != NULL) {
+        free(v->data);
+    }
     UNLOCK;
+#ifndef TS_NO_THREADS
     pthread_mutex_destroy(&v->mutex);
+#endif
 }
 
 static void grow_up(ts_vector_t *v) {
