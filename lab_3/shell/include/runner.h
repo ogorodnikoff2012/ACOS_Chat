@@ -8,6 +8,9 @@
 #include "command.h"
 #include <termios.h>
 
+extern int last_signal;
 void run_command_group(command_group_t *grp, struct termios *info);
+void bg_jobs_stack_init();
+void bg_jobs_stack_destroy();
 
 #endif // XENON_SMASH_RUNNER_H

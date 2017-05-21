@@ -14,11 +14,13 @@
 #include <ts_vector/ts_vector.h>
 #include <limits.h>
 #include <runner.h>
+#include <chdir.h>
 
 static char *HISTORY_FILE = NULL;
 
 static void sighandler(int signum, siginfo_t *info, void *ptr) {
     printf("Recieved signal %d\n", signum);
+    last_signal = signum;
 }
 
 static void save_history() {
@@ -26,6 +28,7 @@ static void save_history() {
 }
 
 static void setup_sighandlers() {
+//    setsid();
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_sigaction = sighandler;
@@ -42,6 +45,7 @@ static void setup_sighandlers() {
 }
 
 static void setup_history() {
+    using_history();
     asprintf(&HISTORY_FILE, "%s/.smash_history", getenv("HOME"));
 
     read_history(HISTORY_FILE);
@@ -61,6 +65,11 @@ static void setup_terminal(struct termios *shell_tmodes) {
     tcgetattr(STDIN_FILENO, shell_tmodes);
 }
 
+static void setup_dirstack() {
+    chdir_init();
+    atexit(chdir_destroy);
+}
+
 static void repl(bool interactive) {
     struct termios shell_tmodes;
     if (interactive) {
@@ -69,6 +78,8 @@ static void repl(bool interactive) {
         setup_vars();
         setup_terminal(&shell_tmodes);
     }
+    setup_dirstack();
+    bg_jobs_stack_init();
     bool work = true;
 
     ts_vector_t vector;
@@ -162,10 +173,32 @@ static void repl(bool interactive) {
 }
 
 int main(int argc, char *argv[]) {
-    char *path_buf = malloc(PATH_MAX + 1);
-    realpath(argv[0], path_buf);
-    setenv("SHELL", path_buf, 1);
-    free(path_buf);
+    char *var_buf = malloc(PATH_MAX + 1);
+    realpath(argv[0], var_buf);
+    setenv("SHELL", var_buf, 1);
+    free(var_buf);
+
+    var_buf = NULL;
+    asprintf(&var_buf, "%d", getuid());
+    setenv("UID", var_buf, 1);
+    free(var_buf);
+
+    var_buf = NULL;
+    asprintf(&var_buf, "%d", getpid());
+    setenv("PID", var_buf, 1);
+    free(var_buf);
+
+    var_buf = NULL;
+    asprintf(&var_buf, "%d",argc);
+    setenv("__SMASH_INTERNAL_ARGC__", var_buf, 1);
+    free(var_buf);
+
+    for (int i = 0; i < argc; ++i) {
+        char *var_name = NULL;
+        asprintf(&var_name, "__SMASH_INTERNAL_ARG_%d__", i);
+        setenv(var_name, argv[i], 1);
+        free(var_name);
+    }
 
     if (argc > 1) {
         FILE *f = freopen(argv[1], "r", stdin);
@@ -173,6 +206,8 @@ int main(int argc, char *argv[]) {
             error(1, errno, "Cannot open file %s", argv[1]);
         }
     }
-    repl(argc == 1);
+
+    int interactive = isatty(STDIN_FILENO);
+    repl(interactive > 0);
     return 0;
 }

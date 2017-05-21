@@ -48,6 +48,10 @@ int find_subst_end(char *str, int idx) {
     return balance == 0 ? idx : -1;
 }
 
+bool is_digit(char c) {
+    return c >= '0' && c <= '9';
+}
+
 char *parse_double_quoted_helper(char *str, size_t len) {
     string_buffer_t buffer;
     string_buffer_init(&buffer);
@@ -62,12 +66,28 @@ char *parse_double_quoted_helper(char *str, size_t len) {
             }
 
             int subst_len = subst_end - subst_begin;
-            if (subst_len > 2) {
+            if (subst_len >= 2) {
                 char *varname = parse_double_quoted_helper(str + subst_begin + 1, (size_t) (subst_len - 2));
+                if (varname == NULL) {
+                    string_buffer_destroy(&buffer);
+                    return NULL;
+                }
                 string_buffer_append(&buffer, getenv(varname));
                 free(varname);
             } else {
-                // Temporarily do nothing
+                if (str[subst_begin] == '#') {
+                    string_buffer_append(&buffer, getenv("__SMASH_INTERNAL_ARGC__"));
+                } else if (is_digit(str[subst_begin])) {
+                    char *varname = strdup("__SMASH_INTERNAL_ARG_%__");
+                    *strchr(varname, '%') = str[subst_begin];
+                    string_buffer_append(&buffer, getenv(varname));
+                    free(varname);
+                } else if (str[subst_begin] == '?') {
+                    string_buffer_append(&buffer, "0"); // TODO replace with normal exit code
+                } else {
+                    string_buffer_destroy(&buffer);
+                    return NULL;
+                }
             }
             i = subst_end - 1;
             continue;

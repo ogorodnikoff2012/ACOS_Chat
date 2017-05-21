@@ -17,6 +17,9 @@ void string_buffer_destroy(string_buffer_t *buf) {
 }
 
 void string_buffer_append(string_buffer_t *buf, const char *str) {
+    if (str == NULL) {
+        return;
+    }
     --buf->size;
     while (*str != '\0') {
         ts_vector_push_back(buf, (void *) (str++));

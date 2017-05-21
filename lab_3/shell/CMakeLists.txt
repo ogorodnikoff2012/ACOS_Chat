@@ -14,6 +14,6 @@ include_directories("include")
 add_subdirectory("lib/ts_map")
 add_subdirectory("lib/ts_vector")
 
-add_executable(smash src/main.c src/lexer.c src/parser.c src/string_buffer.c src/command.c src/runner.c)
+add_executable(smash src/main.c src/lexer.c src/parser.c src/string_buffer.c src/command.c src/runner.c src/chdir.c)
 
 target_link_libraries(smash ts_map ts_vector ${Readline_LIBRARY})
