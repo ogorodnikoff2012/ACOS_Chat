@@ -71,7 +71,6 @@ static void setup_dirstack() {
 }
 
 static void repl(bool interactive) {
-    struct termios shell_tmodes;
     if (interactive) {
         setup_sighandlers();
         setup_history();

@@ -19,6 +19,7 @@
 static ts_vector_t bg_jobs;
 
 int last_signal = -1;
+struct termios shell_tmodes;
 
 void bg_jobs_stack_init() {
     ts_vector_init(&bg_jobs, sizeof(int));
@@ -36,12 +37,13 @@ static void bg(int pgid) {
 
 static void fg(int pgid) {
     kill(pgid, SIGCONT);
+    tcsetpgrp(STDIN_FILENO, pgid);
     int status = 0;
     while (true) {
         int rc = waitpid(-pgid, &status, 0);
         if (rc == -1) {
             if (errno == EINTR) {
-                kill(pgid, last_signal);
+                kill(-pgid, last_signal);
                 bg(pgid);
                 break;
             } else if (errno == ECHILD) {
@@ -55,6 +57,9 @@ static void fg(int pgid) {
             }
         }
     }
+    tcsetpgrp(STDIN_FILENO, getpgrp());
+//    tcgetattr(shell_terminal, &j->tmodes);
+    tcsetattr(STDIN_FILENO, TCSADRAIN, &shell_tmodes);
 }
 
 #define MAX_HIST_PRINT_LENGTH 1000
@@ -183,6 +188,10 @@ void run_command_group(command_group_t *grp, struct termios *info) {
             error(2, errno, "failed while forking");
         }
         if (result == 0) {
+            if (pgid < 0) {
+//                setsid();
+                setpgrp();
+            }
             if (cmd->fin != NULL) {
                 FILE *f = fopen(cmd->fin, "r");
                 if (f == NULL) {
@@ -219,7 +228,7 @@ void run_command_group(command_group_t *grp, struct termios *info) {
             error(2, errno, "exec() failed");
         } else {
             if (pgid < 0) {
-                pgid = result;
+                pgid = getpgid(result);
             }
             int rc = setpgid(result, pgid);
             if (rc < 0) {
