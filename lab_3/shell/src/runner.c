@@ -15,6 +15,7 @@
 #include <string.h>
 #include <chdir.h>
 #include <readline/history.h>
+#include <main.h>
 
 static ts_vector_t bg_jobs;
 
@@ -23,7 +24,6 @@ struct termios shell_tmodes;
 
 void bg_jobs_stack_init() {
     ts_vector_init(&bg_jobs, sizeof(int));
-    atexit(bg_jobs_stack_destroy);
 }
 
 void bg_jobs_stack_destroy() {
@@ -46,7 +46,7 @@ static void fg(int pgid) {
     tcsetpgrp(STDIN_FILENO, pgid);
     int status = 0;
     while (true) {
-        int rc = waitpid(-pgid, &status, 0);
+        int rc = waitpid(-pgid, &status, WUNTRACED);
         if (rc == -1) {
             if (errno == EINTR) {
                 if (last_signal == SIGTSTP || last_signal == SIGINT) {
@@ -154,6 +154,19 @@ static bool process_special_command(command_t *cmd) {
                 printf("[%lu] %d\n", bg_jobs.size - i, jobs[i]);
             }
         }
+        return true;
+    } else if (strcmp(argv[0], "source") == 0 || strcmp(argv[0], ".") == 0) {
+        if (argc < 2) {
+            fprintf(stderr, "source: missing argument\n");
+            return true;
+        }
+        FILE *f = fopen(argv[1], "r");
+        if (f == NULL) {
+            fprintf(stderr, "source: can't open %s: %s\n", argv[1], strerror(errno));
+            return 0;
+        }
+        repl(false, f);
+        fclose(f);
         return true;
     } else if (strcmp(argv[0], "exit") == 0) {
         exit(0);

@@ -15,14 +15,11 @@
 #include <limits.h>
 #include <runner.h>
 #include <chdir.h>
+#include <main.h>
 
 static char *HISTORY_FILE = NULL;
 
 static void sighandler(int signum, siginfo_t *info, void *ptr) {
-    printf("Recieved signal %d\n", signum);
-    if (signum == SIGCHLD) {
-        wait(NULL);
-    }
     last_signal = signum;
 }
 
@@ -32,18 +29,18 @@ static void save_history() {
 
 static void setup_sighandlers() {
 //    setsid();
-    /*
+
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_sigaction = sighandler;
     act.sa_flags = SA_SIGINFO;
     sigaction(SIGINT, &act, NULL);
-    sigaction(SIGHUP, &act, NULL);
+//    sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTSTP, &act, NULL);
-    */
-    signal(SIGINT, SIG_IGN);
+
+//    signal(SIGINT, SIG_IGN);
     signal(SIGQUIT, SIG_IGN);
-    signal(SIGTSTP, SIG_IGN);
+//    signal(SIGTSTP, SIG_IGN);
     signal(SIGTTIN, SIG_IGN);
     signal(SIGTTOU, SIG_IGN);
     signal(SIGCHLD, SIG_IGN);
@@ -69,7 +66,7 @@ static void setup_terminal(struct termios *shell_tmodes) {
 /*    if (setpgid(0, 0) < 0) {
         error(1, errno, "Couldn't put the shell in its own process group");
     }*/
-//    tcgetattr(STDIN_FILENO, shell_tmodes);
+    // tcgetattr(STDIN_FILENO, shell_tmodes);
 }
 
 static void setup_dirstack() {
@@ -77,7 +74,7 @@ static void setup_dirstack() {
     atexit(chdir_destroy);
 }
 
-static void repl(bool interactive) {
+static void init_shell(bool interactive) {
     if (interactive) {
         setup_sighandlers();
         setup_history();
@@ -86,6 +83,9 @@ static void repl(bool interactive) {
     }
     setup_dirstack();
     bg_jobs_stack_init();
+}
+
+void repl(bool interactive, FILE *f) {
     bool work = true;
 
     ts_vector_t vector;
@@ -97,7 +97,7 @@ static void repl(bool interactive) {
             input = readline(getenv(vector.size > 0 ? "PS2" : "PS1"));
         } else {
             size_t size = 0;
-            long int length = getline(&input, &size, stdin);
+            long int length = getline(&input, &size, f);
             if (length < 0) {
                 if (input != NULL) {
                     free(input);
@@ -118,9 +118,14 @@ static void repl(bool interactive) {
         }
 
         const char *iter = input;
+        bool first_token = true;
         while (*iter != 0) {
             token_t *prev_token = vector.size == 0 ? NULL : &((token_t *) (vector.data))[vector.size - 1];
             token_t *token = next_token(&iter, prev_token);
+            if (first_token) {
+                token->separated_from_previous = true;
+                first_token = false;
+            }
             if (token != NULL) {
                 if (token->type == ETT_COMMENT) {
                     free_token(token);
@@ -214,6 +219,7 @@ int main(int argc, char *argv[]) {
     }
 
     int interactive = isatty(STDIN_FILENO);
-    repl(interactive > 0);
+    init_shell(interactive > 0);
+    repl(interactive > 0, stdin);
     return 0;
 }
