@@ -8,8 +8,9 @@
 #include "command.h"
 #include <termios.h>
 
-extern int last_signal;
+extern int last_signal, fg_pgid;
 extern struct termios shell_tmodes;
+
 void run_command_group(command_group_t *grp, struct termios *info);
 void bg_jobs_stack_init();
 void bg_jobs_stack_destroy();

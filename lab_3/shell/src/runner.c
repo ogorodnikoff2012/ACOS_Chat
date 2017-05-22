@@ -19,7 +19,7 @@
 
 static ts_vector_t bg_jobs;
 
-int last_signal = -1;
+int last_signal = -1, fg_pgid = -1;
 struct termios shell_tmodes;
 
 void bg_jobs_stack_init() {
@@ -31,7 +31,7 @@ void bg_jobs_stack_destroy() {
 }
 
 static void bg(int pgid) {
-    kill(pgid, SIGTSTP);
+    kill(-pgid, SIGTSTP);
     ts_vector_push_back(&bg_jobs, &pgid);
 }
 
@@ -42,6 +42,7 @@ static void reopen_terminal() {
 }
 
 static void fg(int pgid) {
+    fg_pgid = pgid;
     kill(-pgid, SIGCONT);
     tcsetpgrp(STDIN_FILENO, pgid);
     int status = 0;
@@ -49,9 +50,6 @@ static void fg(int pgid) {
         int rc = waitpid(-pgid, &status, WUNTRACED);
         if (rc == -1) {
             if (errno == EINTR) {
-                if (last_signal == SIGTSTP || last_signal == SIGINT) {
-                    kill(-pgid, last_signal);
-                }
                 bg(pgid);
                 break;
             } else if (errno == ECHILD) {
@@ -66,6 +64,8 @@ static void fg(int pgid) {
         } else if (rc > 0) {
             waitpid(rc, &status, 0);
             break;
+        } else if (WIFSTOPPED(status)) {
+            break;
         }
     }
 //    reopen_terminal();
@@ -76,6 +76,7 @@ static void fg(int pgid) {
 //    tcgetattr(shell_terminal, &j->tmodes);
     tcsetattr(STDIN_FILENO, TCSADRAIN, &shell_tmodes);*/
     tcsetpgrp(STDIN_FILENO, getpgrp());
+    fg_pgid = -1;
 }
 
 #define MAX_HIST_PRINT_LENGTH 1000
