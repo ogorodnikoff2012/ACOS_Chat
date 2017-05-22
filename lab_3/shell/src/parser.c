@@ -9,6 +9,7 @@
 #include <string.h>
 #include <command.h>
 #include <lexer.h>
+#include <runner.h>
 
 char *parse_plain_token(token_t *token, bool is_first) {
     if (is_first && token->text[0] == '~') {
@@ -83,7 +84,9 @@ char *parse_double_quoted_helper(char *str, size_t len) {
                     string_buffer_append(&buffer, getenv(varname));
                     free(varname);
                 } else if (str[subst_begin] == '?') {
-                    string_buffer_append(&buffer, "0"); // TODO replace with normal exit code
+                    char buf[10];
+                    sprintf(buf, "%d", last_exit_code);
+                    string_buffer_append(&buffer, buf);
                 } else {
                     string_buffer_destroy(&buffer);
                     return NULL;

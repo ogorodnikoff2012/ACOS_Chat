@@ -22,7 +22,7 @@ static char *HISTORY_FILE = NULL;
 static void sighandler(int signum, siginfo_t *info, void *ptr) {
     last_signal = signum;
     if (fg_pgid > 0) {
-        kill(-fg_pgid, signum);
+        kill(-fg_pgid, signum == SIGTSTP ? SIGSTOP : signum);
     }
 }
 

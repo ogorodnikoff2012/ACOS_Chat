@@ -8,7 +8,7 @@
 #include "command.h"
 #include <termios.h>
 
-extern int last_signal, fg_pgid;
+extern int last_signal, fg_pgid, last_exit_code;
 extern struct termios shell_tmodes;
 
 void run_command_group(command_group_t *grp, struct termios *info);

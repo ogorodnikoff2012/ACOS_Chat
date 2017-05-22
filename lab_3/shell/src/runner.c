@@ -19,7 +19,7 @@
 
 static ts_vector_t bg_jobs;
 
-int last_signal = -1, fg_pgid = -1;
+int last_signal = -1, fg_pgid = -1, last_exit_code = 0;
 struct termios shell_tmodes;
 
 void bg_jobs_stack_init() {
@@ -62,7 +62,10 @@ static void fg(int pgid) {
                 break;
             }
         } else if (rc > 0) {
-            waitpid(rc, &status, 0);
+            while (!WIFEXITED(status)) {
+                waitpid(rc, &status, 0);
+            }
+            last_exit_code = WEXITSTATUS(status);
             break;
         } else if (WIFSTOPPED(status)) {
             break;
