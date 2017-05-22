@@ -35,15 +35,23 @@ static void bg(int pgid) {
     ts_vector_push_back(&bg_jobs, &pgid);
 }
 
+static void reopen_terminal() {
+    int newfd = dup(STDIN_FILENO);
+    dup2(newfd, STDIN_FILENO);
+    close(newfd);
+}
+
 static void fg(int pgid) {
-    kill(pgid, SIGCONT);
+    kill(-pgid, SIGCONT);
     tcsetpgrp(STDIN_FILENO, pgid);
     int status = 0;
     while (true) {
         int rc = waitpid(-pgid, &status, 0);
         if (rc == -1) {
             if (errno == EINTR) {
-                kill(-pgid, last_signal);
+                if (last_signal == SIGTSTP || last_signal == SIGINT) {
+                    kill(-pgid, last_signal);
+                }
                 bg(pgid);
                 break;
             } else if (errno == ECHILD) {
@@ -55,11 +63,19 @@ static void fg(int pgid) {
                 }
                 break;
             }
+        } else if (rc > 0) {
+            waitpid(rc, &status, 0);
+            break;
         }
     }
-    tcsetpgrp(STDIN_FILENO, getpgrp());
+//    reopen_terminal();
+    /*int oldgrp = getpgrp();
+    setpgid(getpid(), pgid);
+    tcsetpgrp(STDIN_FILENO, oldgrp);
+    setpgid(getpid(), oldgrp);
 //    tcgetattr(shell_terminal, &j->tmodes);
-    tcsetattr(STDIN_FILENO, TCSADRAIN, &shell_tmodes);
+    tcsetattr(STDIN_FILENO, TCSADRAIN, &shell_tmodes);*/
+    tcsetpgrp(STDIN_FILENO, getpgrp());
 }
 
 #define MAX_HIST_PRINT_LENGTH 1000
@@ -188,9 +204,11 @@ void run_command_group(command_group_t *grp, struct termios *info) {
             error(2, errno, "failed while forking");
         }
         if (result == 0) {
-            if (pgid < 0) {
-//                setsid();
-                setpgrp();
+            int pid = getpid();
+            if (i == 0) {
+                setpgid(pid, pid);
+            } else {
+                setpgid(pid, pgid);
             }
             if (cmd->fin != NULL) {
                 FILE *f = fopen(cmd->fin, "r");
@@ -227,8 +245,8 @@ void run_command_group(command_group_t *grp, struct termios *info) {
             execvp(argv[0], argv);
             error(2, errno, "exec() failed");
         } else {
-            if (pgid < 0) {
-                pgid = getpgid(result);
+            if (i == 0) {
+                pgid = result;
             }
             int rc = setpgid(result, pgid);
             if (rc < 0) {

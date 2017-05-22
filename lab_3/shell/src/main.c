@@ -20,6 +20,9 @@ static char *HISTORY_FILE = NULL;
 
 static void sighandler(int signum, siginfo_t *info, void *ptr) {
     printf("Recieved signal %d\n", signum);
+    if (signum == SIGCHLD) {
+        wait(NULL);
+    }
     last_signal = signum;
 }
 
@@ -29,6 +32,7 @@ static void save_history() {
 
 static void setup_sighandlers() {
 //    setsid();
+    /*
     struct sigaction act;
     memset(&act, 0, sizeof(act));
     act.sa_sigaction = sighandler;
@@ -36,12 +40,13 @@ static void setup_sighandlers() {
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTSTP, &act, NULL);
-//    signal(SIGINT, SIG_IGN);
-//    signal(SIGQUIT, SIG_IGN);
-//    signal(SIGTSTP, SIG_IGN);
-//    signal(SIGTTIN, SIG_IGN);
-//    signal(SIGTTOU, SIG_IGN);
-//    signal(SIGCHLD, SIG_IGN);
+    */
+    signal(SIGINT, SIG_IGN);
+    signal(SIGQUIT, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
+    signal(SIGTTOU, SIG_IGN);
+    signal(SIGCHLD, SIG_IGN);
 }
 
 static void setup_history() {
@@ -58,11 +63,13 @@ static void setup_vars() {
 }
 
 static void setup_terminal(struct termios *shell_tmodes) {
-    if (setpgid(0, 0) < 0) {
-        error(1, errno, "Couldn't put the shell in its own process group");
+    if (tcsetpgrp(STDIN_FILENO, getpgrp()) < 0) {
+        error(1, errno, "tcsetpgrp() failed");
     }
-    tcsetpgrp(STDIN_FILENO, getpgrp());
-    tcgetattr(STDIN_FILENO, shell_tmodes);
+/*    if (setpgid(0, 0) < 0) {
+        error(1, errno, "Couldn't put the shell in its own process group");
+    }*/
+//    tcgetattr(STDIN_FILENO, shell_tmodes);
 }
 
 static void setup_dirstack() {
