@@ -53,7 +53,7 @@ procinfo_t get_procinfo(int pid) {
     char stat_buf[4096];
     fread(stat_buf, 4096, 1, pstat);
     fclose(pstat);
-    
+
     sscanf(stat_buf, "%d", &res.pid);
     char *stat_skip_comm = strrchr(stat_buf, ')');
     if (stat_skip_comm == NULL) {
@@ -64,7 +64,7 @@ procinfo_t get_procinfo(int pid) {
     }
 
     sscanf(stat_skip_comm, "%c %d %*d %*d %*d %*d %*u %*lu %*lu %*lu "
-            "%*lu %lu %lu %*ld %*ld %*ld %ld %*ld %*ld %llu %*lu %ld", 
+            "%*lu %lu %lu %*ld %*ld %*ld %ld %*ld %*ld %llu %*lu %ld",
             &res.stat, &res.ppid, &res.utime, &res.stime, &res.nice, &res.starttime, &res.rss);
 
     struct stat procstat_stat;
@@ -130,14 +130,14 @@ int main(void) {
 
     table_t table;
     init_table(&table, 9);
-    table_set_formatter(&table, 8, "%-*s");
+    table_set_formatter(&table, 8, "%-*.60s");
 
     long long starttime = get_starttime();
     long long memsize = get_ram_in_kb() * 1024ULL;
     double clock_ticks = sysconf(_SC_CLK_TCK);
     long long pagesize = sysconf(_SC_PAGESIZE);
     char buf[4096];
-    
+
     add_row(&table, "PID", "PPID", "USER", "NICE", "\%CPU", "TIME", "\%MEM", "STAT", "COMMAND");
 
     struct dirent *entry;
@@ -168,14 +168,14 @@ int main(void) {
 
             int pid_pos, ppid_pos, uname_pos, nice_pos, pcpu_pos, time_pos, pmem_pos, stat_pos, end_pos;
 
-            sprintf(buf, "%n%d%c%n%d%c%n%s%c%n%ld%c%n%.2f%c%n%d:%02d:%02d%c%n%.2f%c%n%c%c%n", 
-                    &pid_pos, pinfo.pid, '\0', 
-                    &ppid_pos, pinfo.ppid, '\0', 
-                    &uname_pos, pw->pw_name, '\0', 
-                    &nice_pos, pinfo.nice, '\0', 
-                    &pcpu_pos, pcpu, '\0', 
-                    &time_pos, hrs, mins, secs, '\0', 
-                    &pmem_pos, pmem, '\0', 
+            sprintf(buf, "%n%d%c%n%d%c%n%s%c%n%ld%c%n%.2f%c%n%d:%02d:%02d%c%n%.2f%c%n%c%c%n",
+                    &pid_pos, pinfo.pid, '\0',
+                    &ppid_pos, pinfo.ppid, '\0',
+                    &uname_pos, pw->pw_name, '\0',
+                    &nice_pos, pinfo.nice, '\0',
+                    &pcpu_pos, pcpu, '\0',
+                    &time_pos, hrs, mins, secs, '\0',
+                    &pmem_pos, pmem, '\0',
                     &stat_pos, pinfo.stat, '\0',
                     &end_pos);
             int cmdlen = read_cmdline(pinfo.pid, buf + end_pos, 4096 - end_pos);
@@ -189,6 +189,9 @@ int main(void) {
                     buf + time_pos, buf + pmem_pos, buf + stat_pos, buf + end_pos);
         }
     }
+
+    table.col_widths[8] = 0;
+
     print_table(&table);
     free_table(&table);
     closedir(proc);
