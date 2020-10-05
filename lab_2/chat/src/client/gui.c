@@ -228,6 +228,7 @@ void *gui_thread(void *raw_ptr) {
                     send_event(data->controller_event_loop, (event_t *) new_send_message_to_server_job(s));
                 }
                     break;
+                case KEY_ESCAPE:
                 case KEY_PRINT_HELP: {
                     send_event(&data->event_loop, (event_t *) new_display_parsed_message_job(new_parsed_message(
                             MESSAGE_CLIENT_INTERNAL, NULL, strdup(HELP_MSG), get_tstamp()

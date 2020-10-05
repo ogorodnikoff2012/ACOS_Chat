@@ -48,4 +48,4 @@ add_executable(server
         src/server/misc.c
         src/server/worker.c
         )
-target_link_libraries(server event_loop ts_vector xenon_md5 ${CMAKE_THREAD_LIBS_INIT} ${SQLITE3_LIBRARIES})
+target_link_libraries(server event_loop ts_vector xenon_md5 ${CMAKE_THREAD_LIBS_INIT} ${SQLite3_LIBRARIES})

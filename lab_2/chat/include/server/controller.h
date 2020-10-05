@@ -7,7 +7,7 @@
 
 #include <sqlite3.h>
 
-typedef struct worker_data worker_data_t;
+struct worker_data;
 
 typedef struct {
     event_loop_t event_loop, workers_event_loop, *listener_event_loop;
@@ -18,7 +18,7 @@ typedef struct {
 } controller_data_t;
 
 void decrease_workers(controller_data_t *data);
-void kill_worker(worker_data_t *data);
+void kill_worker(struct worker_data *data);
 void run_worker(controller_data_t *data);
 
 int controller_init(controller_data_t *data);

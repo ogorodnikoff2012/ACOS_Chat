@@ -1,6 +1,7 @@
 #ifndef XENON_CHAT_CLIENT_DEFINES_H
 #define XENON_CHAT_CLIENT_DEFINES_H
 
+#define KEY_ESCAPE 27
 #define KEY_ALTERNATE_BACKSPACE 127
 #define KEY_CLOSE_APP KEY_F(10)
 #define KEY_LIST_USERS KEY_F(5)
@@ -50,6 +51,9 @@
 "Press F5 to see list of users;\n" \
 "Press F2 to kick user (you can do it only if you're root);\n" \
 "Press F10 to quit;\n" \
-"Press Enter to send message."
+"Press Enter to send message.\n" \
+"Warning! If you see '[[A' when you press <F1>, check your terminal settings.\n" \
+"It's possible that this client cannot recognize escape key sequences.\n" \
+"More info: https://stackoverflow.com/questions/21843395"
 
 #endif /* XENON_CHAT_CLIENT_DEFINES_H */

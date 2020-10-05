@@ -35,7 +35,7 @@ int login_or_register(sqlite3 *db, char *login, char *passwd) {
             return -MSG_STATUS_AUTH_ERROR;
         }
         ++rows;
-        if (strcmp(hash, sqlite3_column_text(stmt, 1)) == 0) {
+        if (strcmp(hash, (const char*)sqlite3_column_text(stmt, 1)) == 0) {
             uid = sqlite3_column_int(stmt, 0);
         }
     }
@@ -95,7 +95,7 @@ char *get_login_by_uid(sqlite3 *db, int uid) {
         if (ans != NULL) {
             free(ans);
         }
-        ans = strdup(sqlite3_column_text(stmt, 0));
+        ans = strdup((const char*)sqlite3_column_text(stmt, 0));
     }
     sqlite3_finalize(stmt);
     return ans;

@@ -11,6 +11,7 @@ parsed_message_t *new_parsed_message(char type, char *author, char *text, uint64
     msg->author = author;
     msg->text = text;
     msg->tstamp = tstamp;
+    return msg;
 }
 
 void delete_parsed_message(parsed_message_t *msg) {

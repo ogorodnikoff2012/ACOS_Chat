@@ -25,3 +25,4 @@
 examples/*
 **/.idea/*
 **/cmake-build-debug/*
+**/*.unused
